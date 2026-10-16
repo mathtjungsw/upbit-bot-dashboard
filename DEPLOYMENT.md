@@ -17,7 +17,7 @@
 
 - 서버 백업: `/opt/bots/upbit/backups/web-dashboard-20261016_130144`
 - 이전 main.py SHA-256: `2e3c309eb8532196a81e179894c4bd7c3c18770b1dcf365d9a49170ed52d3f24`
-- 적용 main.py SHA-256: `f2d482735544fef57581de6d338b569d9113c1391945f305e90b1948b78154778`
+- 적용 main.py SHA-256: `f2d482735544fef57581de6d338b569d9113c1391945f305e90b1948b7815478`
 - 변경 부분: `deploy/bot_display.patch`. 계좌 표시 함수·시트 해제·로컬 신규매수 중지 연결만 변경.
 - 봇/프록시 설치 전 원본 확인, 실패 시 코드·프록시 복구 절차 포함.
 
