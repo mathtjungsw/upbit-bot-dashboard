@@ -1,0 +1,24 @@
+[Unit]
+Description=Private Upbit read-only dashboard API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/upbit-dashboard
+ExecStart=/opt/bots/upbit/.venv/bin/python -m backend.server
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/bots/upbit
+InaccessiblePaths=/opt/bots/upbit/.env /opt/bots/upbit/credentials.json
+ReadWritePaths=/var/lib/upbit-dashboard
+MemoryMax=128M
+UMask=0077
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

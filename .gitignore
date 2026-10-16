@@ -1,0 +1,13 @@
+.local/
+__pycache__/
+*.pyc
+.venv/
+data/
+*.db*
+*.sqlite*
+*.jsonl*
+*.env
+*.pem
+*.key
+*.log
+web_dashboard_snapshot.json
