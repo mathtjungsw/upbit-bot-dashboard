@@ -1,0 +1,97 @@
+diff --git a/.local/bot-main-original.py b/.local/bot-main.py
+index d20c982..01743e8 100644
+--- a/.local/bot-main-original.py
++++ b/.local/bot-main.py
+@@ -65,7 +65,7 @@ FAST_LOOP_SEC = 5
+ FAST_STOP_BUFFER_PCT = 0.01
+ MAX_SHARED_SCAN_AGE_SEC = 15 * 60
+ 
+-USE_SHEET_LOG = True
++USE_SHEET_LOG = False
+ SERVICE_ACCOUNT_FILE = "/opt/bots/upbit/credentials.json"
+ SPREADSHEET_ID = "1l3tNIWDJrHvdGSC5dNoOO1_3QvIn8xQ2XiULw1oBqwg"
+ SHEET_NAME = "시트1"
+@@ -1830,9 +1830,6 @@ def update_account_status(ws, upbit, positions, current_state=None):
+             risk_parts.append("입출금·체결 확인 중 · 수익률 갱신 보류")
+         risk_text = " · ".join(risk_parts)
+ 
+-        if ws is None:
+-            return
+-        from mobile_dashboard import write_mobile_dashboard
+         exit_view = (
+             tp_order_dashboard_snapshot(
+                 position,
+@@ -1841,6 +1838,24 @@ def update_account_status(ws, upbit, positions, current_state=None):
+             )
+             if position else None
+         )
++        # Export the same already-computed display metrics for the private web.
++        # A web/filesystem error never suppresses live exits or the Sheets view.
++        try:
++            from web_dashboard_export import export_dashboard_snapshot
++            export_dashboard_snapshot(
++                now, state, performance, period_metrics, krw_balance,
++                liquidation_equity, current_price, exit_view, balance_warning,
++                policy={"name": STRATEGY_NAME, "ma20_cap": MAX_PRICE_MA20_DISTANCE,
++                        "buy_paused": is_trading_paused(None),
++                        "trail_arm": TRAIL_ARM, "trail_gap": TRAIL_GAP,
++                        "allocation": MAX_ALLOCATION, "reentry_hours": REENTRY_COOLDOWN_SEC/3600,
++                        "atr_stop_min": ATR_STOP_MIN, "atr_stop_max": ATR_STOP_MAX},
++            )
++        except Exception as web_error:
++            print("[WEB SNAPSHOT ERROR]", type(web_error).__name__)
++        if ws is None:
++            return
++        from mobile_dashboard import write_mobile_dashboard
+         write_mobile_dashboard(
+             ws, now, state, performance, period_metrics,
+             krw_balance, liquidation_equity, current_price, exit_view,
+@@ -1852,15 +1867,8 @@ def update_account_status(ws, upbit, positions, current_state=None):
+ 
+ 
+ def is_trading_paused(ws) -> bool:
+-    if not USE_SHEET_LOG or ws is None:
+-        return False
+-
+-    try:
+-        value = ws.acell(PAUSE_CELL).value
+-        return str(value).strip() == PAUSE_VALUE
+-    except Exception as e:
+-        print("[Sheet pause check error]", e)
+-        return False
++    from buy_pause import new_buys_paused
++    return new_buys_paused()
+ 
+ 
+ UPBIT_BASE = "https://api.upbit.com"
+@@ -4140,7 +4148,7 @@ def main():
+     last_candidate_research = dt.datetime.min
+     last_pause_log = dt.datetime.min
+     last_pause_refresh = dt.datetime.min
+-    cached_trading_paused = False
++    cached_trading_paused = is_trading_paused(None)
+     position_research_last: Dict[str, dt.datetime] = {}
+ 
+     log_trade(ws, f"=== {STRATEGY_NAME} START (Trailing + ATR Stop) ===")
+@@ -4163,7 +4171,7 @@ def main():
+     log_trade(
+         ws,
+         f"MIN_24H_VALUE={MIN_24H_VALUE_KRW/1e8:.0f}eok | "
+-        f"REENTRY_COOLDOWN={REENTRY_COOLDOWN_SEC/3600:.0f}h | PAUSE_CELL={PAUSE_CELL}"
++        f"REENTRY_COOLDOWN={REENTRY_COOLDOWN_SEC/3600:.0f}h | PAUSE=LOCAL_NEW_BUYS_ONLY | SHEETS=DISCONNECTED"
+     )
+     log_trade(
+         ws,
+@@ -5017,10 +5025,10 @@ def main():
+                     and (now_kst() - last_pause_log).total_seconds() >= 1800
+                 ):
+                     log_file(
+-                        f"[PAUSE] {PAUSE_CELL}={PAUSE_VALUE}: "
++                        "[PAUSE] local new-buy pause active: "
+                         "new buys paused; exits remain active"
+                     )
+-                    research_log("buy_pause_active", pause_cell=PAUSE_CELL)
++                    research_log("buy_pause_active", control="local_new_buys_only")
+                     last_pause_log = now_kst()
+ 
+             if (
