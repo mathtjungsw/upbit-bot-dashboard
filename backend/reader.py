@@ -5,6 +5,7 @@ import json
 import math
 from pathlib import Path
 import time
+from .review_schedule import schedule
 
 KST=dt.timezone(dt.timedelta(hours=9))
 
@@ -82,6 +83,7 @@ class Reader:
                     'open_ticker':item.get('open_ticker'),
                     'ma20_cap':number(config.get('max_price_ma20_distance'))})
             return dict(available=True,frozen=frozen,started_at=stamp(raw['research_started_at']),
+                        version=raw.get('research_version'),manifest_hash=raw.get('policy_manifest_hash'),
                         updated_at=stamp(raw['updated_at']),rows=rows,error_count=raw.get('error_count'),
                         source_scan_id=raw.get('source_last_scan_id'))
         except (OSError,ValueError,TypeError,KeyError):
@@ -92,11 +94,20 @@ class Reader:
         if raw.get('schema_version')!=1:raise ValueError('unsupported snapshot')
         observed=stamp(raw['observed_at']);dt.datetime.fromisoformat(observed)
         if not isinstance(raw.get('account'),dict) or not isinstance(raw.get('positions'),list):raise ValueError('invalid snapshot')
+        exit_research=self.research('strategy9_research_summary.json')
+        try:
+            health=json.loads((self.root/'runtime_health.json').read_text(encoding='utf-8'))
+            health={key:health.get(key) for key in ('version','observed_at','last_loop_at',
+                'last_completed_loop_at','loop_gap_sec','fast_monitor','buy_blocked','last_success','failures')}
+        except (OSError,ValueError,TypeError,AttributeError):
+            health=None
         return dict(schema_version=1,generated_at=dt.datetime.now(KST).isoformat(),
                     observed_at=observed,source=dict(service_active=bool(active),
                     observation_seconds=60,loop_seconds=30,view_seconds=5),
                     account=raw['account'],periods=raw.get('periods') or {},
                     positions=raw['positions'],policy=raw.get('policy') or {},
                     warnings=raw.get('warnings') or [],scan=raw.get('scan') or {},
+                    runtime=health,exit_research=exit_research,
+                    review=schedule(self.root,exit_research),
                     trades=self.history(),research=self.research('strategy8_research_summary.json'),
                     previous_research=self.research('strategy7_research_summary.json',True))

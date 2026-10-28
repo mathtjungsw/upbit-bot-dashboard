@@ -68,6 +68,12 @@ def export_dashboard_snapshot(now, state, performance, periods, cash, equity,
                     exit_view={key:view.get(key) for key in ('price','raw_trigger_price',
                         'state_label','fill_pct','executed_volume','remaining_volume',
                         'partial_avg_price','is_trailing','armed','peak_pnl')})
+        pending=position.get('pending_exit_order') or {}
+        item['order_status']=('매도 주문 결과 확인 중' if pending.get('uuid') else
+            '매도 접수 여부 확인 필요' if pending or position.get('pending_exit_intent') else
+            '익절 주문 확인 중' if position.get('tp_order_uuid') else '매도 조건 감시 중')
+        item['stop_distance_pct']=((price/number(position.get('stop_price'))-1)*100
+            if price and number(position.get('stop_price')) else None)
         positions.append(item)
     payload=dict(schema_version=1,observed_at=iso(now),account=account,positions=positions,
                  periods={key:{field:number((periods.get(key) or {}).get(field))
