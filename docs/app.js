@@ -21,6 +21,50 @@ const empty=(title,text='',symbol='database')=>`<div class="empty">${icon(symbol
 const reason=v=>v==='TRAIL_EXIT'?'트레일링 익절':v.startsWith('STOP_FIXED')?'고정 손절':v.startsWith('STOP')?'손절':v.startsWith('FIXED')||v.includes('LIMIT_TP')?'익절':v==='BUY'?'신규 진입':v;
 const duration=v=>{const seconds=age(v);return Number.isFinite(seconds)?`${Math.floor(seconds/3600)}시간 ${Math.floor(seconds%3600/60)}분`:'—';};
 
+let globalSplitOverview, globalSplitHistory;
+{ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const n=v=>v===null||v===undefined?null:Number.isFinite(Number(v))?Number(v):null;
+const money=v=>n(v)===null?'—':Math.round(n(v)).toLocaleString('ko-KR')+'원';
+const pct=v=>n(v)===null?'—':(n(v)>0?'+':'')+n(v).toFixed(2)+'%';
+const names={existing:'1 · 기존 전략',random:'2 · 무작위 트레일링',morning:'3 · 아침 전략 준비금'};
+const when=v=>v?new Date(v).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false}):'—';
+
+function splitOverview(d){
+ const s=d.split_portfolio,eq=n(s.equity_krw),principal=n(d.account.net_contributions_krw);
+ const qualified=s.account_qualified&&!s.hold&&eq!==null;
+ const profit=qualified&&principal!==null?eq-principal:null;
+ const rate=profit!==null&&principal>0?profit/principal*100:null;
+ return '<section class="hero-account"><div class="hero-head"><span>세 전략 분할 운용</span><span>33% · 33% · 33% · 예비금 1%</span></div>'+
+ '<div class="hero-main"><div><span>운용 원화·코인 평가액</span><strong>'+money(eq)+'</strong></div><div><span>누적 손익 / 원금 대비</span><strong>'+money(profit)+' / '+pct(rate)+'</strong></div></div>'+
+ '<p>과거 잔량 5종은 별도 보존 · 평가액은 현재 매수호가 기준, 향후 매도수수료 차감 전</p></section>'+
+ ((!qualified||s.error)?'<p class="notice">체결·계좌 대사 확인 중: '+esc(s.hold||s.error||'미체결 주문 또는 관측 확인 필요')+' · 미확인 수익률은 표시하지 않습니다.</p>':'')+
+ '<p class="period-note">세 전략 모두 코인·대기 주문이 없을 때만 다시 분할합니다. 아침 전략 자금은 현재 현금으로 보관합니다.</p>'+
+ '<div class="holdings-grid">'+s.sleeves.map(v=>{
+  const p=v.position,avg=p?n(p.funds)/n(p.qty):null;
+  const arm=v.id==='random'?10:4,gap=v.id==='random'?3:1.5;
+  const line=p?avg*(1+(p.armed?n(p.peak)-gap/100:arm/100)):null;
+  return '<article class="holding"><div class="holding-top"><h3>'+esc(names[v.id]||v.id)+'</h3><span>'+esc(p?p.market.replace('KRW-',''):'현금')+'</span></div>'+
+   '<div class="holding-price"><strong>'+money(v.equity_krw)+'</strong><b>'+pct(v.return_pct)+'</b></div>'+
+   '<div class="position-levels"><div><span>보유 현금</span><strong>'+money(v.cash_krw)+'</strong></div><div><span>실현손익 · 수수료 반영</span><strong>'+money(v.realized_krw)+'</strong></div></div>'+
+   (p?'<p>잔여 '+esc(p.qty)+'개 · 평단 '+esc(avg?.toLocaleString('ko-KR',{maximumFractionDigits:8}))+'원</p><p>현재가 '+money(v.price)+' · '+(p.armed?'트레일 청산 기준':'트레일 발동 기준')+' '+money(line)+'</p>':'')+
+   '<p class="position-order-note">'+(v.id==='random'?'가격 손절 없음 · 트레일 10% / 3%p · 유의 지정 시 예외 매도':v.id==='existing'?'가격 손절 -6% · 트레일 4% / 1.5%p · 기존 진입 조건':'분석·합의 전에는 매수하지 않음')+'</p>'+
+   (p?.last_exit_reason?'<p class="notice">청산 진행: '+esc(p.last_exit_reason)+'</p>':'')+'</article>';
+ }).join('')+'</div>'+
+ '<p>공통 예비금 '+money(s.reserve_krw)+' · 대기 주문 '+esc(s.pending_orders)+'건 · 재분배 '+esc(s.rebalance_generation)+'회</p>'+
+ '<p class="footnote">새 분할 운용의 기간 TWR 연결은 검증 전입니다. 과거 기간수익률을 현재 값으로 표시하지 않습니다. 업데이트 '+esc(when(s.updated_at))+'</p>'+
+ '<section><div class="section-heading"><h2>최근 분할 매매</h2></div>'+splitOrders(d,5)+'</section>';
+}
+function splitOrders(d,limit){
+ const rows=(d.split_portfolio.recent_orders||[]).filter(o=>n(o.qty)>0).slice(0,limit);
+ if(!rows.length)return '<p>새 분할 전략의 확인된 체결 기록이 아직 없습니다.</p>';
+ return rows.map(o=>'<article class="holding"><h3>'+esc(names[o.owner])+' · '+esc(o.market)+' · '+(o.side==='BUY'?'매수':'매도')+'</h3>'+
+  '<p>'+esc(when(new Date(Number(o.created_at)*1000).toISOString()))+' · 체결 '+esc(o.qty)+'개 · '+(o.terminal?'주문 종료':'부분체결 확인 중')+'</p>'+
+  '<p>체결가 '+money(n(o.funds)/n(o.qty))+' · 수수료 '+money(o.fee)+(o.side==='SELL'?' · 해당 주문 순손익 '+money(o.realized_krw):'')+'</p>'+
+  '<p class="footnote">주문별 누적 체결 기준입니다. 부분매도 잔여 수량은 전략 카드에 표시합니다.</p></article>').join('');
+}
+function splitHistory(d){return '<section><h2>분할 운용 체결 기록</h2>'+splitOrders(d,100)+'<p class="footnote">분할 전 매매 원본과 기존 손익 원장은 서버에 보존합니다.</p></section>';}
+
+ globalSplitOverview=splitOverview; globalSplitHistory=splitHistory; }
 function trade(t){const sell=t.side==='SELL';return `<details class="trade-item" data-trade-id="${esc(t.id)}"><summary class="trade-row"><span class="trade-name"><time>${stamp(t.ts,true)}</time><strong>${esc(t.ticker.replace('KRW-',''))}</strong></span><span class="trade-reason"><span class="${sell?'sell-type':'buy-type'}">${sell?'매도':'매수'}</span><small>${esc(reason(t.reason))}</small></span><span class="trade-pnl ${tone(t.pnl_krw)}"><strong>${sell?signed(t.pnl_krw):'—'}</strong><small>${sell?pct(t.return_pct):''}</small><em>${t.basis==='NET_CONFIRMED'?'수수료 반영':t.basis==='FILL_CONFIRMED'?'체결 확인':'확인 필요'}</em></span>${icon('chevron-down')}</summary><div class="trade-detail"><span>체결가 <b>${price(t.price)}원</b></span><span>수량 <b>${price(t.qty)}</b></span><span>매도 수수료 <b>${sell?won(t.fee_krw):'—'}</b></span><p>${sell?'전체 포지션의 마지막 청산 기록입니다. 부분매도가 있었으면 합산된 최종 순손익을 표시합니다.':'실제 주문 체결 기록입니다.'}</p></div></details>`;}
 
 function baseHolding(p){const view=p.exit_view??{},active=p.trail_armed;
@@ -34,7 +78,8 @@ function accountOverview(d){const a=d.account,period=d.periods;
  return `<section class="hero-account" aria-label="실전 계좌"><div class="hero-head"><span>실전 계좌 · 순투입 원금 대비</span><span class="small-label">UPBIT / KRW</span></div><div class="hero-main"><div><span>누적 수익률</span><strong class="${tone(a.return_pct)}">${pct(a.return_pct)}</strong></div><div class="hero-pnl"><span>누적 손익</span><strong class="${tone(a.adjusted_total_pnl_krw)}">${signed(a.adjusted_total_pnl_krw)}</strong></div></div><div class="hero-details"><div><span>현재 봇 자산</span><b>${won(a.equity_krw)}</b></div><div><span>순투입 원금</span><b>${won(a.net_contributions_krw)}</b></div><div><span>보유 현금</span><b>${won(a.cash_krw)}</b></div></div></section><div class="period-strip" aria-label="기간 수익률"><div><span>오늘 00시부터</span><b class="${tone(period.day?.return_pct)}">${pct(period.day?.return_pct)}</b></div><div><span>최근 7일</span><b class="${tone(period.week?.return_pct)}">${pct(period.week?.return_pct)}</b></div><div><span>최근 30일</span><b class="${tone(period.month?.return_pct)}">${pct(period.month?.return_pct)}</b></div></div><p class="period-note">기간 수익률은 입출금 영향을 제외한 TWR입니다.</p><div class="rule-strip"><span>트레일 <b>4% / 1.5%p</b></span><span>신규 배분 <b>${finite(d.policy.allocation)?(d.policy.allocation*100).toFixed(1):'—'}%</b></span><span>이격 <b>≤20%</b></span><button class="icon-button" data-action="help" aria-label="계산 및 전략 기준">${icon('circle-help')}</button></div><section><div class="section-heading"><h2>현재 보유</h2><span>${d.positions.length}종목</span></div>${d.positions.length?`<div class="holdings-grid single-position">${d.positions.map(holding).join('')}</div>`:empty('현금으로 대기 중',d.scan.waiting_reason||'조건을 충족하는 코인을 찾고 있습니다.','shield-check')}</section><section class="trades-section"><div class="section-heading"><h2>최근 매매 성과</h2><button class="text-button" data-tab="trades">전체 보기 ${icon('chevron-right')}</button></div><p class="section-note">청산 완료된 최근 5건 · 매수·매도 수수료 반영</p><div class="trade-list">${last.length?last.map(trade).join(''):empty('완료된 매매 기록 없음','','history')}</div></section>`;
 }
 
-function history(d){const all=d.trades.filter(t=>state.filter==='ALL'||t.side===state.filter);state.page=Math.min(state.page,Math.max(0,Math.ceil(all.length/10)-1));const rows=all.slice(state.page*10,state.page*10+10);return `<section class="trades-section"><div class="section-heading"><h2>거래내역</h2><span>최근 보관 자료 ${all.length}건</span></div><div class="segments" role="group" aria-label="거래 구분">${[['ALL','전체'],['BUY','매수'],['SELL','매도']].map(([v,t])=>`<button data-filter="${v}" aria-pressed="${state.filter===v}">${t}</button>`).join('')}</div><div class="trade-heading"><span>시간 · 코인</span><span>구분 / 사유</span><span>순손익</span></div><div class="trade-list">${rows.length?rows.map(trade).join(''):empty('해당 거래 없음','','history')}</div><div class="pagination"><button class="icon-button" data-action="previous" aria-label="이전 거래" ${!state.page?'disabled':''}>${icon('chevron-left')}</button><span>${all.length?state.page+1:0} / ${Math.ceil(all.length/10)}</span><button class="icon-button" data-action="next" aria-label="다음 거래" ${(state.page+1)*10>=all.length?'disabled':''}>${icon('chevron-right')}</button></div><p class="footnote">최대 최근 150건을 조회합니다. 체결·순손익을 확인하지 못한 값은 ‘—’로 표시합니다. 원본 연구·매매 기록은 서버에 보관합니다.</p></section>`;}
+function history(d){if(d.split_portfolio)return globalSplitHistory(d)+legacyHistory(d);return legacyHistory(d);}
+function legacyHistory(d){const all=d.trades.filter(t=>state.filter==='ALL'||t.side===state.filter);state.page=Math.min(state.page,Math.max(0,Math.ceil(all.length/10)-1));const rows=all.slice(state.page*10,state.page*10+10);return `<section class="trades-section"><div class="section-heading"><h2>거래내역</h2><span>최근 보관 자료 ${all.length}건</span></div><div class="segments" role="group" aria-label="거래 구분">${[['ALL','전체'],['BUY','매수'],['SELL','매도']].map(([v,t])=>`<button data-filter="${v}" aria-pressed="${state.filter===v}">${t}</button>`).join('')}</div><div class="trade-heading"><span>시간 · 코인</span><span>구분 / 사유</span><span>순손익</span></div><div class="trade-list">${rows.length?rows.map(trade).join(''):empty('해당 거래 없음','','history')}</div><div class="pagination"><button class="icon-button" data-action="previous" aria-label="이전 거래" ${!state.page?'disabled':''}>${icon('chevron-left')}</button><span>${all.length?state.page+1:0} / ${Math.ceil(all.length/10)}</span><button class="icon-button" data-action="next" aria-label="다음 거래" ${(state.page+1)*10>=all.length?'disabled':''}>${icon('chevron-right')}</button></div><p class="footnote">최대 최근 150건을 조회합니다. 체결·순손익을 확인하지 못한 값은 ‘—’로 표시합니다. 원본 연구·매매 기록은 서버에 보관합니다.</p></section>`;}
 
 function legacyAnalysis(d){const r=state.archive?d.previous_research:d.research;const stale=r.available&&!r.frozen&&age(r.updated_at)>300;
  return `<section class="analysis-section"><div class="section-heading"><h2>가상 전략 비교</h2><span>실전 계좌와 별도</span></div><div class="segments" role="group" aria-label="연구 기간"><button data-archive="false" aria-pressed="${!state.archive}">현재 이격 비교</button><button data-archive="true" aria-pressed="${state.archive}">이전 연구</button></div>${r.available?`<div class="analysis-summary"><span>${r.frozen?'종료된 이전 실험':'동일 시작 시각 · 동일 원금 · 독립 가상 계정'}</span><strong>${r.frozen?'이전 비교군':'이격 상한만 비교'}</strong><p>시작 ${stamp(r.started_at,true)} · ${r.frozen?'종료 자료':'갱신'} ${stamp(r.updated_at,true)}</p></div>${stale?'<p class="notice">연구 자료 갱신 지연 · 마지막 저장값입니다.</p>':''}<div class="strategy-grid">${r.rows.map(s=>`<article class="strategy-row"><div><h3>${esc(s.name)}${s.is_baseline&&!r.frozen?'<span class="current-label">당시 기준</span>':''}</h3><small>완료 ${money(s.trades)}건 · 보유 ${esc((s.open_ticker||'현금').replace('KRW-',''))}</small></div><strong class="${tone(s.marked_return_pct)}">${pct(s.marked_return_pct)}</strong><p>최대낙폭 ${pct(s.max_drawdown_pct)}<span>비용 스트레스 ${pct(s.stress_return_pct)}</span></p></article>`).join('')}</div>`:empty('연구 자료 준비 중','서버 연구 요약을 확인하고 있습니다.')}<p class="footnote">평가 수익률은 보유 중인 가상 포지션과 비용 가정을 반영합니다. 실전은 기존 보유 코인을 유지하므로 가상 계정과 거래가 다를 수 있습니다. 이전 연구는 시작 시점과 조건이 달라 현재 연구와 직접 순위를 비교하지 않습니다.</p><div class="health-section"><h2>계좌와 운용 기준</h2><dl>${[['누적 TWR',pct(d.periods.cumulative?.return_pct)],['누적 TWR 최대낙폭',pct(d.periods.cumulative?.mdd_pct)],['누적 입금',won(d.account.cumulative_deposits_krw)],['누적 출금',won(d.account.cumulative_withdrawals_krw)],['기존 원금 조정',signed(d.account.legacy_external_adjustment_krw)],['원장 매매손익',signed(d.account.total_pnl_krw)],['대사 차이',signed(d.account.external_change_krw)],['스캔 ID',d.scan.id??'—'],['계좌 관측',stamp(d.observed_at,true)],['봇 감시 / 계좌 갱신 / 화면 조회','30초 / 1분 / 5초']].map(([k,v])=>`<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></div></section>`;
@@ -52,7 +97,7 @@ function render(){if(!state.session&&!demo){login();return;}const d=state.data,s
 }
 
 function holding(p){return baseHolding(p).replace('트레일 청산선','매도 발동 기준가')+`<p class="position-order-note">${esc(p.order_status||'주문 상태는 다음 계좌 갱신에서 확인')} · 손절 기준가 대비 ${pct(p.stop_distance_pct)}<br>발동 기준가는 실제 체결가격이나 거래소에 걸어둔 주문가격이 아닙니다.</p>`;}
-function overview(d){return reviewNotice(d.review)+runtimePanel(d.runtime)+accountOverview(d);}
+function overview(d){if(d.split_portfolio)return globalSplitOverview(d);return reviewNotice(d.review)+runtimePanel(d.runtime)+accountOverview(d);}
 function analysis(d){return reviewNotice(d.review)+exitResearch(d.exit_research)+(d.previous_exit_research?.available?`<details class="runtime-card"><summary>이전 연구9 · 별도 누적 중</summary>${exitResearch(d.previous_exit_research)}</details>`:'')+legacyAnalysis(d);}
 
 let timer,controller,inFlight=false,backoff=5000;
