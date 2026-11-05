@@ -13,3 +13,23 @@ export function fixture(){
  trades:Array.from({length:24},(_,i)=>({id:'demo-'+i,ts:new Date(Date.now()-(i+1)*6*3600000).toISOString(),ticker:['KRW-ALPHA','KRW-BETA','KRW-GAMMA'][i%3],side:i%4===3?'BUY':'SELL',reason:i%4===3?'BUY':i===4?'STOP_ATR_12.00':'TRAIL_EXIT',qty:1200,price:428+i,pnl_krw:i===4?-45000:34200-i*1320,return_pct:i===4?-8.1:2.31-i*.08,fee_krw:2100,basis:i%4===3?'FILL_CONFIRMED':'NET_CONFIRMED'})),
  scan:{id:18250,candidates:2},research,previous_research:{...research,frozen:true,rows:research.rows.map((s,i)=>({...s,name:['기존 트레일 4%/1.5%p','순익 2% 지정가 · 급등 2%','트레일 · 급등 1.5%'][i]}))}};
 }
+
+export function splitFixture(){
+ const d=fixture(), now=Date.now()/1000;
+ const sleeves=[
+  {id:'existing',cash_krw:420000,equity_krw:2042000,realized_krw:54000,price:162.2,return_pct:5.32,
+   position:{market:'KRW-ALPHA',qty:10000,funds:1540000,entry_fees:770,armed:true,peak:.071,opened_at:now-86400}},
+  {id:'random',cash_krw:280000,equity_krw:1745000,realized_krw:0,price:14.65,return_pct:-2.33,
+   position:{market:'KRW-BETA',qty:100000,funds:1500000,entry_fees:750,armed:false,peak:.014,opened_at:now-7200}},
+  {id:'morning',cash_krw:1813000,equity_krw:1813000,realized_krw:-48000,position:null},
+ ];
+ d.split_portfolio={updated_at:d.observed_at,equity_krw:5660000,reserve_krw:60000,pending_orders:0,rebalance_generation:2,
+  morning_live_enabled:true,morning_status:{reason:'WAIT_0859_FRAME'},account_qualified:true,sleeves,recent_orders:Array.from({length:32},(_,i)=>({
+   id:'order-demo-'+i,owner:sleeves[i%3].id,side:i%2?'BUY':'SELL',market:['KRW-ALPHA','KRW-BETA','KRW-GAMMA'][i%3],
+   qty:5000,funds:770000,fee:385,realized_krw:i%4===0?6250:-14850,cost_basis_krw:780000,terminal:true,
+   terminal_state:i%5===0?'cancel':'done',created_at:now-(i+1)*780}))};
+ d.morning_research={paper_only:true,live_orders_enabled:false,elapsed_calendar_days:5,start_date:'2026-11-06',end_date:'2026-12-17',
+  primary:'상승형 기준',primary_completed_trade_days:2,minimum_trade_days:25,assumptions:{initial_cash:1000000},
+  models:[{id:'상승형 기준',return_pct:1.27,closed_trades:2},{id:'무작위 비교군',return_pct:-.8,closed_trades:3}]};
+ return d;
+}
