@@ -1,4 +1,5 @@
 import {reviewNotice,runtimePanel,exitResearch} from './study-ui.js?v=20261030-1';
+import {twoTrackResearch} from './two-track-ui.js?v=20261109-1';
 import {splitOverview as globalSplitOverview,splitHistory as globalSplitHistory,morningResearch} from './split-ui.js?v=20261105-readability-1';
 const LOCAL=['localhost','127.0.0.1'].includes(location.hostname);
 const API=LOCAL?`${location.origin}/upbit-api`:'https://stock-journal.52-79-211-161.sslip.io/upbit-api';
@@ -59,7 +60,7 @@ function render(){if(!state.session&&!demo){login();return;}const d=state.data,s
 function holding(p){return baseHolding(p).replace('트레일 청산선','매도 발동 기준가')+`<p class="position-order-note">${esc(p.order_status||'주문 상태는 다음 계좌 갱신에서 확인')} · 손절 기준가 대비 ${pct(p.stop_distance_pct)}<br>발동 기준가는 실제 체결가격이나 거래소에 걸어둔 주문가격이 아닙니다.</p>`;}
 function overview(d){if(d.split_portfolio)return globalSplitOverview(d);return reviewNotice(d.review)+runtimePanel(d.runtime)+accountOverview(d);}
 function analysis(d){const old=reviewNotice(d.review)+exitResearch(d.exit_research)+(d.previous_exit_research?.available?`<details class="runtime-card" data-expand-id="legacy-research-9"><summary>이전 연구9 · 별도 누적 중</summary>${exitResearch(d.previous_exit_research)}</details>`:'')+legacyAnalysis(d);
- return d.split_portfolio?(morningResearch(d.morning_research)||empty('아침 연구 자료 대기','실전 운용 성과와 별도로 표시합니다.'))+'<details class="sd-archive" data-expand-id="legacy-analysis"><summary>기존 연구·계좌 기록 보기</summary>'+old+'</details>':old;}
+ return d.split_portfolio?twoTrackResearch(d.morning_two_track)+(morningResearch(d.morning_research)||empty('아침 연구 자료 대기','실전 운용 성과와 별도로 표시합니다.'))+'<details class="sd-archive" data-expand-id="legacy-analysis"><summary>기존 연구·계좌 기록 보기</summary>'+old+'</details>':old;}
 
 let timer,controller,inFlight=false,backoff=5000;
 async function request(path,body){const response=await fetch(API+path,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json',...(state.session?{Authorization:'Bearer '+state.session.token}:{})},body:JSON.stringify(body),signal:AbortSignal.timeout(12000)});const result=await response.json();if(!response.ok)throw Error(result.error||'연결 확인 필요');return result;}
@@ -76,5 +77,5 @@ dialogs.addEventListener('click',event=>{if(event.target.closest('[data-close]')
 document.addEventListener('keydown',event=>{if(!dialogs.firstChild)return;if(event.key==='Escape')dialogs.innerHTML='';if(event.key==='Tab'){const buttons=[...dialogs.querySelectorAll('button')];if(buttons.length===1){event.preventDefault();buttons[0].focus();}}});
 document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(document.hidden)controller?.abort();else poll();});
 setInterval(()=>{const clock=document.querySelector('#live-clock');if(clock)clock.textContent=stamp(new Date().toISOString(),true);},1000);
-if(demo){const {fixture,splitFixture}=await import('./demo.js?v=20261105-readability-1');state.data=new URLSearchParams(location.search).has('legacy')?fixture():splitFixture();}
+if(demo){const {fixture,splitFixture,twoTrackFixture}=await import('./demo.js?v=20261109-two-track-1');state.data=new URLSearchParams(location.search).has('legacy')?fixture():splitFixture();if(new URLSearchParams(location.search).has('twoTrack'))state.data.morning_two_track=twoTrackFixture();}
 render();poll();

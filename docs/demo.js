@@ -33,3 +33,8 @@ export function splitFixture(){
   models:[{id:'상승형 기준',return_pct:1.27,closed_trades:2},{id:'무작위 비교군',return_pct:-.8,closed_trades:3}]};
  return d;
 }
+// Synthetic, local-demo-only data. Never contains live account balances.
+export function twoTrackFixture(){
+ const ids=['A_anchor_ioc','H_volume_1p5','H_lows_1','H_active_18','H_C_matched_exit','L_signal_p1','L_random_p1','L_signal_p0p5','L_random_p0p5'];
+ return {version:'morning-two-track-v1-20261109',paper_only:true,live_orders_enabled:false,start_date:'2026-11-10',end_date:'2026-12-07',valid_finalized_days:0,review:'시작 전',updated_at:'2026-11-09T15:00:00+09:00',health:{state:'SCHEDULED_NOT_STARTED'},models:ids.map(id=>({id,cash:'1000000',equity_krw:'1000000',realized:'0',return_pct:'0',closed_trades:0,position:null,extra_cost_totals:{'30':'0'},delay2_equity:'1000000'}))};
+}
