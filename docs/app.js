@@ -1,5 +1,5 @@
 import {reviewNotice,runtimePanel,exitResearch} from './study-ui.js?v=20261030-1';
-import {twoTrackResearch} from './two-track-ui.js?v=20261109-1';
+import {twoTrackResearch} from './two-track-ui.js?v=20261109-2';
 import {splitOverview as globalSplitOverview,splitHistory as globalSplitHistory,morningResearch} from './split-ui.js?v=20261105-readability-1';
 const LOCAL=['localhost','127.0.0.1'].includes(location.hostname);
 const API=LOCAL?`${location.origin}/upbit-api`:'https://stock-journal.52-79-211-161.sslip.io/upbit-api';
