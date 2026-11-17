@@ -1,4 +1,4 @@
-const names={existing:['01','기존 전략','추세·선별 매매'],random:['02','무작위 트레일링','가격 손절 없음'],morning:['03','아침 전략','09:00 지정가 IOC']};
+const names={existing:['01','기존 전략','추세·선별 매매'],random:['02','무작위 트레일링','매도 후 10분 대기'],morning:['03','아침 전략','09:00 지정가 IOC'],surge:['04','실시간 급등','배정 현금 전액 · 지정가 IOC']};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=new Intl.NumberFormat('ko-KR',{maximumFractionDigits:8});
 const whole=new Intl.NumberFormat('ko-KR',{maximumFractionDigits:0});
@@ -24,7 +24,7 @@ export function strategyMetrics(v,qualified=true){
  const p=v.position, funds=n(p?.funds), fees=n(p?.entry_fees);
  const cost=p?(funds!==null&&fees!==null&&funds>=0&&fees>=0?funds+fees:null):0;
  const unrealized=p?(equity!==null&&cash!==null&&cost!==null?equity-cash-cost:null):0;
- const netAssigned=cash!==null&&cost!==null&&realized!==null?cash+cost-realized:null;
+ const netAssigned=n(v.capital_krw)??(cash!==null&&cost!==null&&realized!==null?cash+cost-realized:null);
  const total=qualified&&equity!==null&&realized!==null&&unrealized!==null?realized+unrealized:null;
  return {cash,equity,realized,unrealized:qualified?unrealized:null,netAssigned:qualified?netAssigned:null,
   total,rate:total!==null&&netAssigned>0?100*total/netAssigned:null};
@@ -34,31 +34,41 @@ function readableStatus(v){
  return ({WAIT_0859_FRAME:'아침 관측 대기',PREPARING:'매수 조건 확인 중',NO_SIGNAL:'조건을 충족한 후보 없음',
   READY:'매수 기회 대기',ORDER_PENDING:'주문 확인 중',HOLDING:'보유 감시 중',EXIT_PENDING:'청산 확인 중',
   EXIT_PENDING_QUOTE:'청산 호가 확인 중',ORDER_TERMINAL:'주문 처리 완료',WINDOW_MISSED:'매수 시간 경과',
-  CHECK_OR_ORDER_NOT_CONFIRMED:'매수 조건 또는 주문 확인 필요',CLOCK_JUMP_NEW_BUY_BLOCKED:'시계 점검으로 신규 매수 보류'})[v]||'상태 확인 대기';
+  CHECK_OR_ORDER_NOT_CONFIRMED:'매수 조건 또는 주문 확인 필요',CLOCK_JUMP_NEW_BUY_BLOCKED:'시계 점검으로 신규 매수 보류',
+  WARMING_UP:'실시간 자료 준비 중',DAILY_LOSS_PAUSE:'당일 손실 제한 · 신규 진입 중지',
+  DAILY_8_ENTRY_LIMIT:'오늘 8회 진입 완료',COIN_DAILY_2_ENTRY_LIMIT:'종목별 2회 제한',COIN_COOLDOWN:'동일 종목 재진입 대기',
+  SURGE_ACCOUNT_UNQUALIFIED:'계좌 대사 확인 대기',SURGE_SIGNAL_EXPIRED:'급등 신호 유효시간 경과',
+  SURGE_SPREAD:'호가 간격 초과',SURGE_PRICE_ESCAPED:'지정가 상한 초과',SURGE_PAUSED:'신규 매수 일시정지',
+  SURGE_SIGNAL_ALREADY_ATTEMPTED:'같은 급등 신호 · 재주문 안 함',SURGE_RESIDUAL_BELOW_MINIMUM:'거래소 최소 매도금액 미달 · 잔량 보존',
+  DISABLED:'신규 매수 OFF',EXIT_QUOTE_UNAVAILABLE:'전체 수량 청산 호가 미확인'})[v]||'확인 필요 · '+esc(v||'대기');
 }
 
 function sleeve(v,s,qualified){
  const p=v.position,m=strategyMetrics(v,qualified),[num,name,desc]=names[v.id]||['—',esc(v.id),''];
  const qty=n(p?.qty), funds=n(p?.funds), avg=qty>0&&funds!==null?funds/qty:null;
- const isMorning=v.id==='morning',isRandom=v.id==='random';
- const stop=avg===null||isRandom?null:Math.max(avg*(isMorning ? .98 : .94),n(p?.stop_price)??0);
+ const isMorning=v.id==='morning',isRandom=v.id==='random',isSurge=v.id==='surge';
+ const stop=avg===null||isRandom?null:Math.max(avg*((isMorning||isSurge) ? .98 : .94),n(p?.stop_price)??0);
  const peak=n(p?.peak),arm=isRandom ? .10 : .04,gap=isRandom ? .03 : .015;
  const line=avg===null||(p?.armed&&peak===null)?null:avg*(1+(p?.armed?peak-gap:arm));
  const today=s.morning_status;
+ const cooldown=isRandom&&timestamp(v.next_entry_at)>Date.now()?Math.ceil((timestamp(v.next_entry_at)-Date.now())/60000):0;
+ const surgeDay=Object.values(s.surge_days||{}).at(-1);
+ const stateText=isSurge?readableStatus(s.surge_status?.reason):isMorning&&s.morning_live_enabled?readableStatus(today?.reason):'현재 보유 종목 없음';
  return '<article class="sd-card">'+
   '<div class="sd-card-head"><div class="sd-title"><span class="sd-num">'+num+'</span><div><h3>'+name+'</h3><p>'+desc+'</p></div></div>'+
-  (p?chip(String(p.market??'').replace(/^KRW-/,'')+' 보유','active'):isMorning&&!s.morning_live_enabled?chip('신규 매수 OFF'):chip('현금 대기'))+'</div>'+
+  (p?chip(String(p.market??'').replace(/^KRW-/,'')+' 보유','active'):(isMorning&&!s.morning_live_enabled)||(isSurge&&!s.surge_live_enabled)?chip('신규 매수 OFF'):cooldown?chip(cooldown+'분 후 매수 가능'):chip('현금 대기'))+'</div>'+
   '<div class="sd-result"><span>누적 수익률 <small>순배정액 기준</small></span><strong class="'+tone(m.rate)+'">'+pct(m.rate)+'</strong>'+
   '<p>누적 손익 <b class="'+tone(m.total)+'">'+money(m.total,true)+'</b></p></div>'+
   '<dl class="sd-metrics">'+metric('현재 평가액',money(m.equity))+metric('누적 실현손익',money(m.realized,true),tone(m.realized))+
   metric('보유 평가손익',money(m.unrealized,true),tone(m.unrealized))+metric('보유 현금',money(m.cash))+'</dl>'+
   '<p class="sd-position">'+(p?'보유 '+coin(p.market)+' · 평단 대비 <b class="'+tone(v.return_pct)+'">'+pct(v.return_pct)+'</b>':
-    isMorning&&s.morning_live_enabled?readableStatus(today?.reason):'현재 보유 종목 없음')+'</p>'+
+    stateText)+'</p>'+
+  (isSurge?'<p class="sd-note">'+(s.surge_status?.feed?.warmup_remaining>0?'관측 준비 약 '+Math.ceil(s.surge_status.feed.warmup_remaining/60)+'분 남음 · ':'')+'오늘 전략 수익률 '+pct(s.surge_risk?.return_pct)+'<br>오늘 진입 '+esc(surgeDay?.entries??0)+' / 8회 · 연속 손실 '+esc(surgeDay?.losses??0)+' / 3회<br>손절 -2% · 트레일 4% / 1.5%p · 미발동 10분 종료</p>':'')+
   '<details class="sd-detail" data-expand-id="sleeve-'+esc(v.id)+'"><summary data-focus-id="detail-'+esc(v.id)+'">운용 상세</summary><dl class="sd-metrics">'+
   metric('순배정액',money(m.netAssigned))+metric('보유 수량',qty===null?'—':number.format(qty))+
   (p?metric('평균 매수가',price(avg))+metric('현재 매수호가',price(v.price))+metric('가격 손절선',isRandom?'없음':price(stop))+
     metric(p.armed?'트레일 청산 기준':'트레일 발동 기준',price(line))+metric('포지션 시작',fmt(timestamp(p.opened_at))):'')+
-  '</dl><p>'+(isRandom?'트레일 10% / 3%p · 유의 지정 시 예외 매도':isMorning?'가격 손절 -2% · 트레일 4% / 1.5%p':'가격 손절 -6% · 트레일 4% / 1.5%p')+'</p>'+
+  '</dl><p>'+(isRandom?'가격 손절 없음 · 트레일 10% / 3%p · 유의 지정 시 매도 · 전량 청산 후 10분 휴식':isSurge?'매수 수수료를 제외한 배정 현금 전액 주문. 부분체결 잔액은 현금 유지. 1일 8회·종목당 2회, 3연속 손실 또는 당일 -5% 이후 신규 진입 중지. 손실 상한 보장 아님.':isMorning?'가격 손절 -2% · 트레일 4% / 1.5%p':'가격 손절 -6% · 트레일 4% / 1.5%p')+'</p>'+
   (isMorning&&today?.candidate?'<p>아침 후보 '+coin(today.candidate)+' · '+readableStatus(today.reason)+'</p>':'')+
   (p?.last_exit_reason?'<p>청산 처리 중 · '+esc(p.last_exit_reason)+'</p>':'')+
   '</details><button class="sd-link" data-split-open="'+esc(v.id)+'" data-focus-id="open-'+esc(v.id)+'">이 전략 거래내역 <span aria-hidden="true">→</span></button></article>';
@@ -84,9 +94,18 @@ export function splitOverview(d){
   '<details class="sd-detail sd-method" data-expand-id="metric-method"><summary data-focus-id="metric-method">수익률·배정 기준</summary>'+
   '<p>전략 누적 손익 = 누적 실현손익 + 현재 보유 평가손익. 누적 수익률은 이를 순배정액(최초 배정액에 전략 간 재분배 순액을 더한 값)으로 나눕니다. 순배정액이 0원 이하이거나 계좌가 미확인 상태면 수익률을 표시하지 않습니다. 기간 수익률(TWR)은 아닙니다.</p>'+
   '<p>전략 평가손익은 매수 수수료를 포함한 원가와 현재 매수호가 기준이며, 앞으로 발생할 매도 수수료는 차감하지 않습니다. 계좌 누적 수익률은 계좌 순투입 원금 대비입니다.</p>'+
-  '<p>33% / 33% / 33% + 예비금 1%. 세 전략 모두 미보유·미체결이며 계좌 대사가 완료됐을 때만 재분배합니다. 재분배 '+esc(s.rebalance_generation??'—')+'회 · 분할 전 별도 보관 자산은 제외합니다.</p></details></section>'+
+  '<p>'+(s.version==='split-four-v2'?'네 전략 분할 운용. 코인과 미해결 주문이 없는 전략이 3개 이상이면 해당 전략의 현금만 균등 배분합니다. 보유 전략은 그대로 유지하며 모든 전략이 현금이면 예비금 1%를 제외해 24.75%씩 나눕니다.':'33% / 33% / 33% + 예비금 1%. 세 전략 모두 미보유·미체결일 때 재분배합니다.')+' 재분배 '+esc(s.rebalance_generation??'—')+'회 · 분할 전 별도 보관 자산은 제외합니다.</p></details></section>'+
   '<section class="sd-section">'+heading('최근 실전 체결','<button class="sd-link" data-split-open="ALL">거래내역 보기 →</button>')+
   '<div class="sd-list">'+(recent.length?recent.map(orderRow).join(''):empty('확인된 체결이 아직 없습니다.'))+'</div></section></div>';
+}
+
+export function surgeResearch(r){
+ if(!r||r.paper_only!==true||r.live_orders_enabled!==false)return '';
+ const titles={base:'기준 · 손절 2 / 트레일 4·1.5',stop15:'손절 1.5%',stop25:'손절 2.5%',arm3:'트레일 3% / 1.5%p',gap2:'트레일 4% / 2%p'};
+ return '<div class="sd"><section class="sd-section">'+heading('실시간 급등 비교 연구',chip('가상 · 실전과 별도'))+
+ '<article class="sd-card"><p class="sd-note">동일한 실시간 입력 · 가상 시작금 100만원씩 · 한 번에 한 변수만 변경</p>'+(r.input_ready===false?'<p class="sd-alert">입력 관측 준비 중 · 아직 비교 수익률을 표시하지 않습니다.</p>':'')+'<ul class="sd-models">'+
+ (r.models||[]).map(m=>'<li><span>'+esc(titles[m.id]||m.id)+'</span><b class="'+tone(m.return_pct)+'">'+(m.qualified?pct(m.return_pct):'판정 제외')+'</b><small>'+esc(m.closed)+'회 청산</small></li>').join('')+
+ '</ul><p class="sd-note">진입·청산 최소 1초 지연, 편도 수수료 0.05%, 호가 잔량으로 부분체결 추정. 시세 누락·재시작 중 보유 관측 공백은 기록하고 검증 성과에서 제외합니다. 실제 체결이나 미래 수익을 보장하지 않습니다.</p></article></section></div>';
 }
 
 function filledOrders(s){

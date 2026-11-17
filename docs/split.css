@@ -19,7 +19,7 @@
 .sd-alert{margin:12px 0;background:#fff5e2;color:#754818;border-radius:9px;padding:10px 13px;font-size:13px}
 .sd-section{margin-top:26px}.sd-heading{margin-bottom:12px}.sd-heading h2{font-size:19px}
 .sd-heading>span:not(.sd-chip){font-size:12px;color:var(--sd-muted);text-align:right}
-.sd-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+.sd-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
 .sd-card{min-width:0;background:#fff;border:1px solid var(--sd-border);border-radius:14px;padding:16px}
 .sd-title{min-width:0;justify-content:flex-start}.sd-title h3{font-size:16px;line-height:1.35;word-break:keep-all}
 .sd-title p{font-size:11px;color:var(--sd-muted);margin-top:2px}

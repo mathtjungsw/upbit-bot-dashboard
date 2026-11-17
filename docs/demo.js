@@ -38,3 +38,14 @@ export function twoTrackFixture(){
  const ids=['A_anchor_ioc','H_volume_1p5','H_lows_1','H_active_18','H_C_matched_exit','L_signal_p1','L_random_p1','L_signal_p0p5','L_random_p0p5'];
  return {version:'morning-two-track-v1-20261109',paper_only:true,live_orders_enabled:false,start_date:'2026-11-10',end_date:'2026-12-07',valid_finalized_days:0,review:'시작 전',updated_at:'2026-11-09T15:00:00+09:00',health:{state:'SCHEDULED_NOT_STARTED'},models:ids.map(id=>({id,cash:'1000000',equity_krw:'1000000',realized:'0',return_pct:'0',closed_trades:0,position:null,extra_cost_totals:{'30':'0'},delay2_equity:'1000000'}))};
 }
+
+export function fourFixture(){
+ const d=splitFixture(),s=d.split_portfolio;
+ s.version='split-four-v2';s.surge_live_enabled=true;
+ s.sleeves.push({id:'surge',cash_krw:1200000,capital_krw:1200000,equity_krw:1200000,realized_krw:0,position:null});
+ s.equity_krw+=1200000;d.account.net_contributions_krw+=1200000;
+ s.surge_status={reason:'WARMING_UP',feed:{connected:true,warmup_remaining:780,markets_seen:300}};
+ s.surge_risk={return_pct:0};s.surge_research={paper_only:true,live_orders_enabled:false,models:
+  ['base','stop15','stop25','arm3','gap2'].map(id=>({id,qualified:true,return_pct:0,closed:0}))};
+ return d;
+}
