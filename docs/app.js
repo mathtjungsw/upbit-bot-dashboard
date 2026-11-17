@@ -1,6 +1,6 @@
 import {reviewNotice,runtimePanel,exitResearch} from './study-ui.js?v=20261030-1';
 import {twoTrackResearch} from './two-track-ui.js?v=20261109-2';
-import {splitOverview as globalSplitOverview,splitHistory as globalSplitHistory,morningResearch,surgeResearch} from './split-ui.js?v=20261117-four-1';
+import {splitOverview as globalSplitOverview,splitHistory as globalSplitHistory,morningResearch,surgeResearch} from './split-ui.js?v=20261118-solo-1';
 const LOCAL=['localhost','127.0.0.1'].includes(location.hostname);
 const API=LOCAL?`${location.origin}/upbit-api`:'https://stock-journal.52-79-211-161.sslip.io/upbit-api';
 const KEY='upbit_dashboard_session_v1';
@@ -77,5 +77,5 @@ dialogs.addEventListener('click',event=>{if(event.target.closest('[data-close]')
 document.addEventListener('keydown',event=>{if(!dialogs.firstChild)return;if(event.key==='Escape')dialogs.innerHTML='';if(event.key==='Tab'){const buttons=[...dialogs.querySelectorAll('button')];if(buttons.length===1){event.preventDefault();buttons[0].focus();}}});
 document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(document.hidden)controller?.abort();else poll();});
 setInterval(()=>{const clock=document.querySelector('#live-clock');if(clock)clock.textContent=stamp(new Date().toISOString(),true);},1000);
-if(demo){const {fixture,splitFixture,twoTrackFixture,fourFixture}=await import('./demo.js?v=20261117-four-1');state.data=new URLSearchParams(location.search).has('legacy')?fixture():new URLSearchParams(location.search).has('four')?fourFixture():splitFixture();if(new URLSearchParams(location.search).has('twoTrack'))state.data.morning_two_track=twoTrackFixture();}
+if(demo){const {fixture,splitFixture,twoTrackFixture,fourFixture,soloFixture}=await import('./demo.js?v=20261118-solo-1');state.data=new URLSearchParams(location.search).has('solo')?soloFixture():new URLSearchParams(location.search).has('legacy')?fixture():new URLSearchParams(location.search).has('four')?fourFixture():splitFixture();if(new URLSearchParams(location.search).has('twoTrack'))state.data.morning_two_track=twoTrackFixture();}
 render();poll();

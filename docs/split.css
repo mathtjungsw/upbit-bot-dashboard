@@ -54,6 +54,9 @@
 .sd-study h3{margin:3px 0;font-size:18px}.sd-study p{color:var(--sd-muted);font-size:12px}
 .sd-models{list-style:none;margin:0;padding:0}.sd-models li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;border-top:1px solid var(--sd-border);padding:9px 0}
 .sd-models li span{overflow-wrap:anywhere}.sd-models small{font-size:11px}
+.sd-solo-grid{grid-template-columns:minmax(0,1fr)}
+.sd-solo-banner{margin-top:18px;padding:18px;border:1px solid #9ebdc9;border-left:4px solid #197c80;border-radius:12px;background:#f0f9f8}
+.sd-solo-banner h2{font-size:18px}.sd-solo-banner>p{font-size:13px;line-height:1.7}
 @media(max-width:880px) and (min-width:701px){.sd-card{padding:12px}.sd-title h3{font-size:14px}.sd-grid{gap:8px}}
 @media(max-width:700px){
  .sd-grid{grid-template-columns:minmax(0,1fr);gap:10px}.sd-section{margin-top:19px}.sd-hero{border-radius:13px;padding:15px}

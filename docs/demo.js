@@ -49,3 +49,13 @@ export function fourFixture(){
   ['base','stop15','stop25','arm3','gap2'].map(id=>({id,qualified:true,return_pct:0,closed:0}))};
  return d;
 }
+
+export function soloFixture(){
+ const d=fourFixture(),s=d.split_portfolio,now=Date.now()/1000;
+ s.operation_mode='surge_only_v1';s.equity_krw=4060000;
+ for(const v of s.sleeves){v.cash_krw=v.id==='surge'?4000000:0;v.equity_krw=v.cash_krw;v.position=null;}
+ s.sleeves.find(v=>v.id==='surge').capital_krw=4000000;
+ s.solo_trial={phase:'ready',started_at:now,review_at:now+604800,daily_limit_waiver_until:now+604800,
+   daily_entry_limit:null,trial_return_pct:0,baseline_equity_krw:4000000,review_due:false};
+ return d;
+}

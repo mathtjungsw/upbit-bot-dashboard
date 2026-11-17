@@ -47,6 +47,8 @@ function sleeve(v,s,qualified){
  const p=v.position,m=strategyMetrics(v,qualified),[num,name,desc]=names[v.id]||['—',esc(v.id),''];
  const qty=n(p?.qty), funds=n(p?.funds), avg=qty>0&&funds!==null?funds/qty:null;
  const isMorning=v.id==='morning',isRandom=v.id==='random',isSurge=v.id==='surge';
+ const trial=s.operation_mode==='surge_only_v1'?s.solo_trial:null;
+ const limitLabel=trial?.daily_entry_limit===null?'한시적 제한 해제':'8회';
  const stop=avg===null||isRandom?null:Math.max(avg*((isMorning||isSurge) ? .98 : .94),n(p?.stop_price)??0);
  const peak=n(p?.peak),arm=isRandom ? .10 : .04,gap=isRandom ? .03 : .015;
  const line=avg===null||(p?.armed&&peak===null)?null:avg*(1+(p?.armed?peak-gap:arm));
@@ -63,12 +65,12 @@ function sleeve(v,s,qualified){
   metric('보유 평가손익',money(m.unrealized,true),tone(m.unrealized))+metric('보유 현금',money(m.cash))+'</dl>'+
   '<p class="sd-position">'+(p?'보유 '+coin(p.market)+' · 평단 대비 <b class="'+tone(v.return_pct)+'">'+pct(v.return_pct)+'</b>':
     stateText)+'</p>'+
-  (isSurge?'<p class="sd-note">'+(s.surge_status?.feed?.warmup_remaining>0?'관측 준비 약 '+Math.ceil(s.surge_status.feed.warmup_remaining/60)+'분 남음 · ':'')+'오늘 전략 수익률 '+pct(s.surge_risk?.return_pct)+'<br>오늘 진입 '+esc(surgeDay?.entries??0)+' / 8회 · 연속 손실 '+esc(surgeDay?.losses??0)+' / 3회<br>손절 -2% · 트레일 4% / 1.5%p · 미발동 10분 종료</p>':'')+
+  (isSurge?'<p class="sd-note">'+(s.surge_status?.feed?.warmup_remaining>0?'관측 준비 약 '+Math.ceil(s.surge_status.feed.warmup_remaining/60)+'분 남음 · ':'')+'오늘 전략 수익률 '+pct(s.surge_risk?.return_pct)+'<br>오늘 진입 '+esc(surgeDay?.entries??0)+'회 · '+limitLabel+'<br>연속 손실 '+esc(surgeDay?.losses??0)+' / 3회 · 손실 -5% 신규 진입 차단<br>손절 -2% · 트레일 4% / 1.5%p · 미발동 10분 종료</p>':'')+
   '<details class="sd-detail" data-expand-id="sleeve-'+esc(v.id)+'"><summary data-focus-id="detail-'+esc(v.id)+'">운용 상세</summary><dl class="sd-metrics">'+
   metric('순배정액',money(m.netAssigned))+metric('보유 수량',qty===null?'—':number.format(qty))+
   (p?metric('평균 매수가',price(avg))+metric('현재 매수호가',price(v.price))+metric('가격 손절선',isRandom?'없음':price(stop))+
     metric(p.armed?'트레일 청산 기준':'트레일 발동 기준',price(line))+metric('포지션 시작',fmt(timestamp(p.opened_at))):'')+
-  '</dl><p>'+(isRandom?'가격 손절 없음 · 트레일 10% / 3%p · 유의 지정 시 매도 · 전량 청산 후 10분 휴식':isSurge?'매수 수수료를 제외한 배정 현금 전액 주문. 부분체결 잔액은 현금 유지. 1일 8회·종목당 2회, 3연속 손실 또는 당일 -5% 이후 신규 진입 중지. 손실 상한 보장 아님.':isMorning?'가격 손절 -2% · 트레일 4% / 1.5%p':'가격 손절 -6% · 트레일 4% / 1.5%p')+'</p>'+
+  '</dl><p>'+(isRandom?'가격 손절 없음 · 트레일 10% / 3%p · 유의 지정 시 매도 · 전량 청산 후 10분 휴식':isSurge?'매수 수수료를 제외한 배정 현금 전액 주문. 부분체결 잔액은 현금 유지. 하루 진입 '+limitLabel+' · 종목당 하루 2회, 3연속 손실 또는 당일 -5% 이후 신규 진입 중지. 손실 상한 보장 아님.':isMorning?'가격 손절 -2% · 트레일 4% / 1.5%p':'가격 손절 -6% · 트레일 4% / 1.5%p')+'</p>'+
   (isMorning&&today?.candidate?'<p>아침 후보 '+coin(today.candidate)+' · '+readableStatus(today.reason)+'</p>':'')+
   (p?.last_exit_reason?'<p>청산 처리 중 · '+esc(p.last_exit_reason)+'</p>':'')+
   '</details><button class="sd-link" data-split-open="'+esc(v.id)+'" data-focus-id="open-'+esc(v.id)+'">이 전략 거래내역 <span aria-hidden="true">→</span></button></article>';
@@ -76,6 +78,7 @@ function sleeve(v,s,qualified){
 
 export function splitOverview(d){
  const s=d.split_portfolio,eq=n(s.equity_krw),principal=n(d.account?.net_contributions_krw);
+ const solo=s.operation_mode==='surge_only_v1',trial=s.solo_trial;
  const stamp=Date.parse(s.updated_at),age=Date.now()-stamp;
  const qualified=s.account_qualified===true&&!s.hold&&eq!==null&&d.source?.service_active!==false&&age>=-5000&&age<180000;
  const profit=qualified&&principal!==null?eq-principal:null,rate=profit!==null&&principal>0?100*profit/principal:null;
@@ -89,14 +92,27 @@ export function splitOverview(d){
   '<dl class="sd-hero-meta">'+metric('순투입 원금',money(principal))+metric('공통 예비금',money(s.reserve_krw))+
   metric('대기 주문',n(s.pending_orders)===null?'—':whole.format(n(s.pending_orders))+'건')+'</dl></section>'+
   ((!qualified||s.error)?'<p class="sd-alert" role="status">계좌 또는 주문 상태를 확인 중입니다. 확인되지 않은 손익·수익률은 ‘—’로 표시합니다.</p>':'')+
-  '<section class="sd-section">'+heading('전략별 성과','<span>실전 · 분할 운용 이후</span>')+
-  '<div class="sd-grid">'+(s.sleeves||[]).map(v=>sleeve(v,s,qualified)).join('')+'</div>'+
+  (solo?soloPanel(s,qualified):'')+
+  '<section class="sd-section">'+heading(solo?'운용 중 · 전략4':'전략별 성과','<span>실전 · 누적 기록 보존</span>')+
+  '<div class="sd-grid '+(solo?'sd-solo-grid':'')+'">'+(s.sleeves||[]).filter(v=>!solo||v.id==='surge').map(v=>sleeve(v,s,qualified)).join('')+'</div>'+
+  (solo?'<details class="sd-archive" data-expand-id="solo-archive"><summary>중지한 전략 1·2·3 · 과거 기록 보기</summary><p class="sd-note">신규 매수 중지. 청산 손익은 원래 전략에 남고, 현금 이전은 수익에 포함하지 않습니다. 자금 회수 뒤 의미가 달라지는 수익률 대신 실현손익을 표시합니다.</p><ul class="sd-models">'+(s.sleeves||[]).filter(v=>v.id!=='surge').map(v=>'<li><span>'+esc(label(v.id))+'<small> · '+(v.position?'청산 확인 중':'운용 중지')+'</small></span><b class="'+tone(v.realized_krw)+'">'+money(v.realized_krw,true)+'</b><button class="sd-link" data-split-open="'+esc(v.id)+'">기록</button></li>').join('')+'</ul></details>':'')+
   '<details class="sd-detail sd-method" data-expand-id="metric-method"><summary data-focus-id="metric-method">수익률·배정 기준</summary>'+
   '<p>전략 누적 손익 = 누적 실현손익 + 현재 보유 평가손익. 누적 수익률은 이를 순배정액(최초 배정액에 전략 간 재분배 순액을 더한 값)으로 나눕니다. 순배정액이 0원 이하이거나 계좌가 미확인 상태면 수익률을 표시하지 않습니다. 기간 수익률(TWR)은 아닙니다.</p>'+
   '<p>전략 평가손익은 매수 수수료를 포함한 원가와 현재 매수호가 기준이며, 앞으로 발생할 매도 수수료는 차감하지 않습니다. 계좌 누적 수익률은 계좌 순투입 원금 대비입니다.</p>'+
-  '<p>'+(s.version==='split-four-v2'?'네 전략 분할 운용. 코인과 미해결 주문이 없는 전략이 3개 이상이면 해당 전략의 현금만 균등 배분합니다. 보유 전략은 그대로 유지하며 모든 전략이 현금이면 예비금 1%를 제외해 24.75%씩 나눕니다.':'33% / 33% / 33% + 예비금 1%. 세 전략 모두 미보유·미체결일 때 재분배합니다.')+' 재분배 '+esc(s.rebalance_generation??'—')+'회 · 분할 전 별도 보관 자산은 제외합니다.</p></details></section>'+
+  '<p>'+(solo?'전략4 단독 운용. 기존 공통 예비금과 별도 보관 잔량은 유지하고, 나머지 운용 현금을 전략4로 합칩니다. 기존 전략4 보유분의 추가 매수는 하지 않으며 다음 신규 진입에 사용합니다. 균등 재분배와 4전략 자동 복귀는 하지 않습니다.':s.version==='split-four-v2'?'네 전략 분할 운용. 코인과 미해결 주문이 없는 전략이 3개 이상이면 해당 전략의 현금만 균등 배분합니다. 보유 전략은 그대로 유지하며 모든 전략이 현금이면 예비금 1%를 제외해 24.75%씩 나눕니다.':'33% / 33% / 33% + 예비금 1%. 세 전략 모두 미보유·미체결일 때 재분배합니다.')+' 재분배 '+esc(s.rebalance_generation??'—')+'회 · 분할 전 별도 보관 자산은 제외합니다.</p></details></section>'+
   '<section class="sd-section">'+heading('최근 실전 체결','<button class="sd-link" data-split-open="ALL">거래내역 보기 →</button>')+
   '<div class="sd-list">'+(recent.length?recent.map(orderRow).join(''):empty('확인된 체결이 아직 없습니다.'))+'</div></section></div>';
+}
+
+function soloPanel(s,qualified){
+ const t=s.solo_trial||{},ready=t.phase==='ready';
+ return '<section class="sd-solo-banner" aria-label="전략4 단독시험"><div class="sd-heading"><h2>전략4 단독시험</h2>'+chip(ready?'실전 운용':'청산·자금 통합 중',ready?'active':'warn')+'</div>'+
+ '<dl class="sd-metrics">'+metric('시험 시작 이후 수익률',qualified?pct(t.trial_return_pct):'—',qualified?tone(t.trial_return_pct):'')+
+ metric('시험 시작 평가액',money(t.baseline_equity_krw))+metric('시험 시작 KST',fmt(timestamp(t.started_at)))+metric('7일 검토 시점 KST',fmt(timestamp(t.review_at)))+'</dl>'+
+ '<p>하루 8회 제한 '+(t.daily_entry_limit===null?'<b>한시 해제</b> · '+fmt(timestamp(t.daily_limit_waiver_until))+' 자동 복구':'<b>적용</b>')+'</p>'+
+ '<p class="sd-note">손절 -2% · 트레일 4% / 1.5%p. 종목당 하루 2회·3연속 손실·당일 -5% 차단은 유지합니다. 기존 가상 비교군은 변경하지 않습니다.</p>'+
+ (t.review_due?'<p class="sd-alert">7일 검토 시점입니다. 하루 8회 제한은 복구됐습니다. 4전략 복귀는 자동으로 실행하지 않습니다.</p>':'')+
+ '<p class="sd-note">시험 수익률은 시작 이후 자금 이동 영향을 제외한 NAV 기준이며, 이전 전략 청산 손익은 포함하지 않습니다.</p></section>';
 }
 
 export function surgeResearch(r){
@@ -121,7 +137,7 @@ function orderRow(o){
   '<small>'+(sell?(rate===null?'순손익':pct(rate)):'체결 금액')+'</small></span><span class="sd-chevron" aria-hidden="true">⌄</span></summary>'+
   '<div class="sd-order-detail"><dl class="sd-metrics">'+metric('평균 체결가',price(funds!==null&&q>0?funds/q:null))+
   metric('체결 수량',number.format(q))+metric('수수료',price(o.fee))+metric('주문 상태',status)+'</dl>'+
-  '<p>주문 시각 KST · 주문별 누적 체결'+(sell?' · 순손익에 매수·매도 수수료 반영':'')+'</p></div></details>';
+  '<p>주문 시각 KST · 주문별 누적 체결'+(sell?' · 순손익에 매수·매도 수수료 반영':'')+(o.exit_reason==='OPERATOR_SURGE_ONLY'?' · 전략4 단독 전환 청산':'')+'</p></div></details>';
 }
 
 export function splitHistory(d,{owner='ALL',side='ALL',page=0}={}){
