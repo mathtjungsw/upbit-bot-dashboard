@@ -49,6 +49,7 @@ function sleeve(v,s,qualified){
  const isMorning=v.id==='morning',isRandom=v.id==='random',isSurge=v.id==='surge';
  const trial=s.operation_mode==='surge_only_v1'?s.solo_trial:null;
  const limitLabel=trial?.daily_entry_limit===null?'한시적 제한 해제':'8회';
+ const streakWaived=trial?.consecutive_loss_limit===null;
  const stop=avg===null||isRandom?null:Math.max(avg*((isMorning||isSurge) ? .98 : .94),n(p?.stop_price)??0);
  const peak=n(p?.peak),arm=isRandom ? .10 : .04,gap=isRandom ? .03 : .015;
  const line=avg===null||(p?.armed&&peak===null)?null:avg*(1+(p?.armed?peak-gap:arm));
@@ -65,12 +66,12 @@ function sleeve(v,s,qualified){
   metric('보유 평가손익',money(m.unrealized,true),tone(m.unrealized))+metric('보유 현금',money(m.cash))+'</dl>'+
   '<p class="sd-position">'+(p?'보유 '+coin(p.market)+' · 평단 대비 <b class="'+tone(v.return_pct)+'">'+pct(v.return_pct)+'</b>':
     stateText)+'</p>'+
-  (isSurge?'<p class="sd-note">'+(s.surge_status?.feed?.warmup_remaining>0?'관측 준비 약 '+Math.ceil(s.surge_status.feed.warmup_remaining/60)+'분 남음 · ':'')+'오늘 전략 수익률 '+pct(s.surge_risk?.return_pct)+'<br>오늘 진입 '+esc(surgeDay?.entries??0)+'회 · '+limitLabel+'<br>연속 손실 '+esc(surgeDay?.losses??0)+' / 3회 · 손실 -5% 신규 진입 차단<br>손절 -2% · 트레일 4% / 1.5%p · 미발동 10분 종료</p>':'')+
+  (isSurge?'<p class="sd-note">'+(s.surge_status?.feed?.warmup_remaining>0?'관측 준비 약 '+Math.ceil(s.surge_status.feed.warmup_remaining/60)+'분 남음 · ':'')+'오늘 전략 수익률 '+pct(s.surge_risk?.return_pct)+'<br>오늘 진입 '+esc(surgeDay?.entries??0)+'회 · '+limitLabel+'<br>연속 손실 '+esc(surgeDay?.losses??0)+(streakWaived?'회 · 차단 한시 해제 (횟수 기록 유지)':' / 3회')+'<br>당일 손실 -5% 신규 진입 차단 유지<br>손절 -2% · 트레일 4% / 1.5%p · 미발동 10분 종료</p>':'')+
   '<details class="sd-detail" data-expand-id="sleeve-'+esc(v.id)+'"><summary data-focus-id="detail-'+esc(v.id)+'">운용 상세</summary><dl class="sd-metrics">'+
   metric('순배정액',money(m.netAssigned))+metric('보유 수량',qty===null?'—':number.format(qty))+
   (p?metric('평균 매수가',price(avg))+metric('현재 매수호가',price(v.price))+metric('가격 손절선',isRandom?'없음':price(stop))+
     metric(p.armed?'트레일 청산 기준':'트레일 발동 기준',price(line))+metric('포지션 시작',fmt(timestamp(p.opened_at))):'')+
-  '</dl><p>'+(isRandom?'가격 손절 없음 · 트레일 10% / 3%p · 유의 지정 시 매도 · 전량 청산 후 10분 휴식':isSurge?'매수 수수료를 제외한 배정 현금 전액 주문. 부분체결 잔액은 현금 유지. 하루 진입 '+limitLabel+' · 종목당 하루 2회, 3연속 손실 또는 당일 -5% 이후 신규 진입 중지. 손실 상한 보장 아님.':isMorning?'가격 손절 -2% · 트레일 4% / 1.5%p':'가격 손절 -6% · 트레일 4% / 1.5%p')+'</p>'+
+  '</dl><p>'+(isRandom?'가격 손절 없음 · 트레일 10% / 3%p · 유의 지정 시 매도 · 전량 청산 후 10분 휴식':isSurge?'매수 수수료를 제외한 배정 현금 전액 주문. 부분체결 잔액은 현금 유지. 하루 진입 '+limitLabel+' · 종목당 하루 2회. '+(streakWaived?'3연속 손실 차단은 한시 해제. ':'3연속 손실 이후 신규 진입 중지. ')+'당일 -5% 차단은 유지. 손실 상한 보장 아님.':isMorning?'가격 손절 -2% · 트레일 4% / 1.5%p':'가격 손절 -6% · 트레일 4% / 1.5%p')+'</p>'+
   (isMorning&&today?.candidate?'<p>아침 후보 '+coin(today.candidate)+' · '+readableStatus(today.reason)+'</p>':'')+
   (p?.last_exit_reason?'<p>청산 처리 중 · '+esc(p.last_exit_reason)+'</p>':'')+
   '</details><button class="sd-link" data-split-open="'+esc(v.id)+'" data-focus-id="open-'+esc(v.id)+'">이 전략 거래내역 <span aria-hidden="true">→</span></button></article>';
@@ -110,7 +111,8 @@ function soloPanel(s,qualified){
  '<dl class="sd-metrics">'+metric('시험 시작 이후 수익률',qualified?pct(t.trial_return_pct):'—',qualified?tone(t.trial_return_pct):'')+
  metric('시험 시작 평가액',money(t.baseline_equity_krw))+metric('시험 시작 KST',fmt(timestamp(t.started_at)))+metric('7일 검토 시점 KST',fmt(timestamp(t.review_at)))+'</dl>'+
  '<p>하루 8회 제한 '+(t.daily_entry_limit===null?'<b>한시 해제</b> · '+fmt(timestamp(t.daily_limit_waiver_until))+' 자동 복구':'<b>적용</b>')+'</p>'+
- '<p class="sd-note">손절 -2% · 트레일 4% / 1.5%p. 종목당 하루 2회·3연속 손실·당일 -5% 차단은 유지합니다. 기존 가상 비교군은 변경하지 않습니다.</p>'+
+ '<p>3연속 손실 차단 '+(t.consecutive_loss_limit===null?'<b>한시 해제</b> · '+fmt(timestamp(t.consecutive_loss_waiver?.until))+' 자동 복구 · 손실 횟수는 계속 기록':'<b>적용</b>')+'</p>'+
+ '<p class="sd-note">손절 -2% · 트레일 4% / 1.5%p. 종목당 하루 2회·당일 -5% 차단은 유지합니다. 기존 가상 비교군은 변경하지 않습니다.</p>'+
  (t.review_due?'<p class="sd-alert">7일 검토 시점입니다. 하루 8회 제한은 복구됐습니다. 4전략 복귀는 자동으로 실행하지 않습니다.</p>':'')+
  '<p class="sd-note">시험 수익률은 시작 이후 자금 이동 영향을 제외한 NAV 기준이며, 이전 전략 청산 손익은 포함하지 않습니다.</p></section>';
 }
