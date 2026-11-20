@@ -50,3 +50,32 @@ test('expired streak metadata displays applied limit instead of waiver',()=>{
  assert.match(html,/3연속 손실 차단 <b>적용<\/b>/);
  assert.doesNotMatch(html,/차단 한시 해제 \(횟수 기록 유지\)/);
 });
+
+test('legacy NAV field missing preserves the daily loss protection display',()=>{
+ const html=splitOverview(soloFixture());
+ assert.match(html,/당일 -5% 차단 <b>적용<\/b>/);
+ assert.match(html,/당일 -5% 차단은 유지/);
+});
+
+test('daily NAV waiver has an expiry, keeps P&L and boundary protection explicit',()=>{
+ const d=soloFixture(),s=d.split_portfolio;
+ s.solo_trial.daily_nav_loss_limit_pct=null;
+ s.solo_trial.daily_nav_loss_waiver={until:s.solo_trial.review_at};
+ s.surge_risk={return_pct:-8,boundary_gap:true,blocked:true};
+ const html=splitOverview(d);
+ assert.match(html,/당일 -5% 차단 <b>한시 해제<\/b>/);
+ assert.match(html,/오늘 전략 수익률 -8\.00%/);
+ assert.match(html,/자동 복구 · 당일 손익은 계속 기록/);
+ assert.match(html,/날짜 경계 관측 공백 · 신규 진입 중지/);
+ assert.match(html,/손절 -2%/);
+ assert.doesNotMatch(html,/당일 -5% 차단은 유지/);
+});
+
+test('expired NAV waiver with retained historical metadata shows applied limit',()=>{
+ const d=soloFixture(),s=d.split_portfolio;
+ s.solo_trial.daily_nav_loss_limit_pct=-5;
+ s.solo_trial.daily_nav_loss_waiver={until:1};
+ const html=splitOverview(d);
+ assert.match(html,/당일 -5% 차단 <b>적용<\/b>/);
+ assert.doesNotMatch(html,/당일 손실 -5% 차단 한시 해제/);
+});
