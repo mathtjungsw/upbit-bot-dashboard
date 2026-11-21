@@ -13,7 +13,8 @@ const tone=v=>n(v)>0?'gain':n(v)<0?'drop':'';
 const coin=v=>esc(String(v??'').replace(/^KRW-/,'')||'—');
 const fmt=(v,formatter=date)=>Number.isFinite(v)&&Math.abs(v)<=8.64e15?formatter.format(v):'—';
 const timestamp=v=>n(v)===null?NaN:n(v)*1000;
-const label=id=>names[id]?.[1]||id;
+const more={daily_tp:'하루 첫 익절',repeat_tp:'반복 익절'};
+const label=id=>names[id]?.[1]||more[id]||id;
 const heading=(title,hint='')=>'<div class="sd-heading"><h2>'+title+'</h2>'+hint+'</div>';
 const chip=(title,t='')=>'<span class="sd-chip '+t+'">'+esc(title)+'</span>';
 const metric=(title,value,t='')=>'<div><dt>'+title+'</dt><dd class="'+t+'">'+value+'</dd></div>';
@@ -184,7 +185,7 @@ export function splitHistory(d,{owner='ALL',side='ALL',page=0}={}){
  const filter=(values,selected,attr,title)=>'<div class="sd-filters" role="group" aria-label="'+title+'">'+values.map(([key,text])=>
   '<button data-'+attr+'="'+key+'" data-focus-id="'+attr+'-'+key+'" aria-pressed="'+(selected===key)+'">'+text+'</button>').join('')+'</div>';
  return '<div class="sd"><section class="sd-section">'+heading('실전 거래내역','<span>조회 결과 '+found.length+'건</span>')+
-  filter([['ALL','전체 전략'],...Object.keys(names).map(k=>[k,label(k)])],owner,'split-owner','전략 선택')+
+  filter([['ALL','전체 전략'],...[...Object.keys(names),...(d.split_portfolio?.version==='split-six-v3'?Object.keys(more):[])].map(k=>[k,label(k)])],owner,'split-owner','전략 선택')+
   filter([['ALL','전체 체결'],['BUY','매수'],['SELL','매도']],side,'split-side','매수·매도 선택')+
   '<div class="sd-list">'+(found.length?found.slice(current*10,current*10+10).map(orderRow).join(''):empty('선택한 조건에 해당하는 체결이 없습니다.'))+'</div>'+
   (pages>1?'<div class="sd-pages"><button data-split-page="'+(current-1)+'" data-focus-id="split-prev" '+(!current?'disabled':'')+'>이전</button><span>'+(current+1)+' / '+pages+'</span><button data-split-page="'+(current+1)+'" data-focus-id="split-next" '+(current+1>=pages?'disabled':'')+'>다음</button></div>':'')+
