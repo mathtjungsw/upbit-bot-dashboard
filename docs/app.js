@@ -1,4 +1,4 @@
-import {isSix,sixOverview,sixResearch} from './six-ui.js?v=six-1';
+import {isSix,sixOverview,sixResearch} from './six-ui.js?v=six-detail-2';
 import {reviewNotice,runtimePanel,exitResearch} from './study-ui.js?v=20261030-1';
 import {twoTrackResearch} from './two-track-ui.js?v=20261109-2';
 import {splitOverview as globalSplitOverview,splitHistory as globalSplitHistory,morningResearch,surgeResearch} from './split-ui.js?v=six-1';

@@ -14,3 +14,45 @@
 @media(min-width:820px){.s6 .s6-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.s6>section{padding:1.25rem}.s6 .s6-hero .s6-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:380px){.s6>section{padding:.75rem}.s6 .s6-card{padding:.7rem}.s6 .s6-card>header{flex-wrap:wrap}}
 .s6 .s6-alert{margin:.5rem 0;background:#ffefdc;color:#744315;padding:.7rem .85rem;border:1px solid #dbaf7a;border-radius:.6rem;font-size:.94rem}
+
+/* Live sleeve performance. The two returns stay adjacent on a narrow handset. */
+.s6 .s6-returns {
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start;
+  gap:.35rem .8rem; padding:.75rem .85rem; margin:.6rem 0;
+  border:1px solid #cddde7; border-radius:.65rem; background:#edf4f8;
+}
+.s6 .s6-returns dt,.s6 .s6-detail-body dt {
+  font-size:.875rem; font-weight:500; line-height:1.35; color:#40566b;
+  word-break:keep-all; overflow-wrap:anywhere;
+}
+.s6 .s6-returns dd {
+  margin:.18rem 0 0; font-size:clamp(1.1rem,4.9vw,1.5rem); line-height:1.22;
+  font-weight:750; font-variant-numeric:tabular-nums; letter-spacing:-.025em;
+  white-space:normal; overflow-wrap:anywhere;
+}
+.s6 .s6-return-caption {margin:.35rem 0 .75rem; color:#40566b; font-size:.875rem; line-height:1.45; word-break:keep-all; overflow-wrap:anywhere}
+.s6 .s6-details {margin-top:.8rem; border-top:1px solid #bdcfdc}
+.s6 .s6-details > summary {
+  display:flex; align-items:center; gap:.45rem; min-height:44px; padding:.5rem .15rem;
+  color:#22475d; font-size:.95rem; font-weight:700; cursor:pointer;
+  list-style:none; word-break:keep-all; overflow-wrap:anywhere;
+}
+.s6 .s6-details > summary::-webkit-details-marker {display:none}
+.s6 .s6-details > summary::after {
+  content:""; width:.52rem; height:.52rem; flex:none; margin:0 .25rem 0 auto;
+  border-right:2px solid currentColor; border-bottom:2px solid currentColor; transform:rotate(45deg);
+}
+.s6 .s6-details[open] > summary::after {transform:rotate(225deg)}
+.s6 .s6-details > summary:focus-visible {outline:3px solid #1165ae; outline-offset:2px; border-radius:.25rem}
+.s6 .s6-detail-body {padding:.2rem 0 .5rem; color:var(--s6-navy)}
+.s6 .s6-detail-body dl {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem .85rem; margin:0}
+.s6 .s6-detail-body dd {margin:.14rem 0 0; font-size:1rem; line-height:1.35; font-weight:650; font-variant-numeric:tabular-nums; white-space:normal; overflow-wrap:anywhere}
+.s6 .s6-detail-body h4 {margin:.8rem 0 .4rem; font-size:.92rem; font-weight:700}
+.s6 .s6-recentmini {list-style:none; padding:0; margin:.35rem 0 0}
+.s6 .s6-recentmini li {display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.15rem .65rem; border-top:1px solid var(--s6-line); padding:.4rem 0; font-size:.9rem; overflow-wrap:anywhere}
+.s6 .s6-recentmini li > :last-child {font-variant-numeric:tabular-nums}
+.s6 .s6-recentmini small {color:var(--s6-muted); font-size:.835rem}
+@media(max-width:350px) {
+  .s6 .s6-returns {padding:.6rem; gap:.3rem .55rem}
+  .s6 .s6-detail-body dl {gap:.5rem .55rem}
+}

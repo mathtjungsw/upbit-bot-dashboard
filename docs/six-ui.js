@@ -49,6 +49,17 @@ function quoteKnown(v,id,now){
  if(!(num(v.price)>0))return false;
  return !['daily_tp','repeat_tp'].includes(id)||freshness(v.price_observed_at,now,15000);
 }
+function closedFor(s,id){
+ const rows=new Map();
+ for(const o of arr(s.recent_orders)){
+  const net=num(o?.cycle_net_krw),base=num(o?.cycle_cost_krw);
+  if(o?.owner!==id||o.side!=='SELL'||o.terminal!==true||net===null||!Number.isFinite(ms(o.terminal_at))||typeof o.market!=='string')continue;
+  const x={market:o.market,closed_at:o.terminal_at,net_krw:net,return_pct:base>0?100*net/base:null,reason:o.exit_reason};
+  rows.set(x.market+'|'+ms(x.closed_at),x);
+ }
+ for(const x of arr(s.recent_closed))if(x?.owner===id&&typeof x.market==='string'&&Number.isFinite(ms(x.closed_at)))rows.set(x.market+'|'+ms(x.closed_at),x);
+ return [...rows.values()].sort((a,b)=>ms(b.closed_at)-ms(a.closed_at)).slice(0,3);
+}
 function sleeve(v,id,s,ok,now,fresh) {
  const idx=owners.indexOf(id);
  if(!v)return '<article class="s6-card"><h3>'+String(idx+1).padStart(2,'0')+' · '+ttl(id)+'</h3>'+pending('전략 원장 미수신')+'</article>';
@@ -62,14 +73,36 @@ function sleeve(v,id,s,ok,now,fresh) {
  const err=typeof v.protection_error==='string'&&v.protection_error.trim().length>0;
  const dayKey=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(now);
  const ctr=s.surge_days?.[dayKey];
+ const valued=ok&&priceOK&&('position' in v),capital=num(v.capital_krw),total=valued?num(v.total_pnl_krw):null;
+ const allRate=valued&&capital>0?num(v.total_return_pct):null;
+ const q=num(p?.qty),avg=fund>0&&q>0?fund/q:null;
+ const price=valued&&p?num(v.price):null;
+ const heldRate=price>0?num(v.return_pct)??(avg>0?100*(price/avg-1):null):null;
+ const n=num(v.closed_trades),w=num(v.winning_trades),scored=Number.isInteger(n)&&n>=0&&Number.isInteger(w)&&w>=0&&w<=n;
+ const validPeriods=valued&&freshness(v.live_periods?.as_of,now,150000)?v.live_periods:{};
+ const arm=id==='random'?0.10:0.04,gap=id==='random'?0.03:0.015,peak=num(p?.peak);
+ const stop=avg===null?null:id==='existing'?Math.max(avg*.94,num(p?.stop_price)??0):id==='random'?null:avg*.98;
+ const recentRows=closedFor(s,id);
+ const returns='<dl class="s6-returns">'+metric('전략 누적 수익률',pct(allRate),tone(allRate))+metric('보유 코인 등락률',p?pct(heldRate):v.position===null?'미보유':'—',tone(heldRate))+'</dl>';
+ const some=(label,value)=>metric(label,pct(value),tone(value));
+ const detail='<details class="s6-details" data-expand-id="s6-'+id+'"><summary data-focus-id="s6-detail-'+id+'">수익률·보유·거래 상세</summary><div class="s6-detail-body">'+
+ '<h4>기간별 수익률</h4><dl>'+some('오늘 00시부터',validPeriods.today)+some('최근 7일',validPeriods.week)+some('최근 14일',valued?v.return_14d_pct:null)+some('6전략 전환 후',validPeriods.since)+'</dl>'+
+ '<p class="s6-return-caption">전략 누적은 이전 실적을 포함한 순배정액 대비 손익입니다. 기간 수익률은 자금 재배분을 제외합니다. 시작 시점 자료가 없으면 — 로 표시합니다.</p>'+
+ (p?'<h4>'+esc(p.market??'보유 종목')+' · 보유 상세</h4><dl>'+metric('평균 매수가',px(avg))+metric('현재 평가가',px(price))+metric('보유 수량',q>0?qty(q)+'개':'—')+metric('잔량 매입원가 · 매수비용 포함',krw(fund!==null&&fee!==null?fund+fee:null))+metric('보유 시작 KST',date(p.opened_at))+metric('보유 경과',held)+
+ (id==='random'?metric('가격 손절','없음 · 유의 지정 예외'):metric('가격 손절 기준',px(stop)))+
+ (fixed?'':metric('트레일 발동 기준',px(avg>0?avg*(1+arm):null))+metric('트레일 상태',p.armed===true?'발동':p.armed===false?'발동 대기':'—')+metric('추적 고점 등락률',pct(peak===null?null:peak*100))+metric('현재 트레일 청산 기준',p.armed===true?px(avg>0&&peak!==null?avg*(1+peak-gap):null):p.armed===false?'아직 미발동':'—'))+'</dl>'+
+ '<p class="s6-return-caption">코인 등락률은 평균 매수가 대비이며 수수료 차감 전입니다. 평가가·보호 기준은 체결가가 아닙니다. 보유시간만으로 매도하지 않습니다.</p>':'')+
+ '<h4>실제 거래 성적</h4><dl>'+metric('전량 청산',count(n))+metric('수익 청산',scored?count(w):'—')+metric('승률',scored&&n>0?(100*w/n).toFixed(1)+'%':n===0?'청산 전':'—')+'</dl>'+
+ (recentRows.length?'<p class="s6-return-caption">최근 확인된 청산 · 최대 3건</p><ul class="s6-recentmini">'+recentRows.map(t=>'<li><span>'+esc(t.market)+' · '+date(t.closed_at)+'</span><strong class="'+tone(t.return_pct)+'">'+pct(t.return_pct)+'</strong><small>'+krw(t.net_krw,true)+' · '+esc(why(t.reason))+'</small></li>').join('')+'</ul>':pending('최근 수신 내역에서 이 전략의 전량 청산 기록이 확인되지 않았습니다.'))+
+ '</div></details>';
  return '<article class="s6-card"><header><div class="s6-name"><span class="s6-num">0'+(idx+1)+'</span><div><h3>'+ttl(id)+'</h3><p>'+policies[idx]+'</p></div></div>'+chip(st,p?'on':'')+'</header>'+
  (err?'<p role="alert" class="s6-alert"><b>보호 주문 확인 필요</b> · '+esc(v.protection_error.slice(0,160))+'</p>':'')+
- '<dl class="s6-kpis">'+metric('순배정액',krw(v.capital_krw))+metric('가용 원화',krw(ok?(v.available_cash_krw??(s.pending_orders===0?v.cash_krw:null)):null))+
+ returns+'<dl class="s6-kpis">'+metric('현재 전략 자산',krw(valued?mval:null))+metric('누적 총손익',krw(total,true),tone(total))+metric('순배정액',krw(v.capital_krw))+metric('가용 원화',krw(ok?(v.available_cash_krw??(s.pending_orders===0?v.cash_krw:null)):null))+
  metric('누적 실현손익',krw(v.realized_krw,true),tone(v.realized_krw))+metric('평가손익',krw(unreal,true),tone(unreal))+
- metric('최근 14일 TWR',pct(ok&&priceOK?v.return_14d_pct:null),ok&&priceOK?tone(v.return_14d_pct):'')+metric('보유 종목',p?p.market??'—':v.position===null?'없음':'—')+'</dl>'+
+ metric('보유 종목',p?p.market??'—':v.position===null?'없음':'—')+metric('6전략 전환 후',pct(validPeriods.since),tone(validPeriods.since))+'</dl>'+
  (id==='surge'?'<div class="s6-callout"><b>신규 진입 제한</b><p>오늘 '+count(ctr?.entries,'회')+' / 8회 · 연속 손실 '+count(ctr?.losses,'회')+' / 3회 · 당일 NAV '+pct(s.surge_risk?.day===dayKey?s.surge_risk?.return_pct:null)+' / −5%</p><p>최근 판정: '+esc(why(v.entry_reason??s.surge_status?.reason))+'</p></div>':'')+
  (fixed&&p?'<div class="s6-callout"><b>익절 주문 추적</b><dl class="s6-kpis">'+orderMetrics(v.target_order,view,ok)+metric('현재 예상 순수익률',pct(ok&&priceOK?v.net_position_return_pct:null))+metric('보유 경과',held)+'</dl>'+(!fresh||!priceOK?'<p>평가 호가 미확인 · 마지막 주문 조회와 현재 평가 호가는 별개입니다.</p>':'')+'<p>시간 청산 없음 · 손절·유의 지정 시 잔량 보호</p></div>':'')+
- '</article>';
+ detail+'</article>';
 }
 function recent(s){
  const rows=Array.isArray(s.recent_closed)?s.recent_closed.filter(x=>x&&owners.includes(x.owner)&&typeof x.market==='string').slice().sort((a,b)=>ms(b.closed_at)-ms(a.closed_at)).slice(0,5):null;
