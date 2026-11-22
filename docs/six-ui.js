@@ -153,9 +153,12 @@ export function sixOverview(d,now=Date.now()) {
   const v=indexed.repeat_tp,w=s.week_performance||{},good=ok&&!!v&&quoteKnown(v,'repeat_tp',now);
   const n=num(w.closed),wins=num(w.wins),win=n>0&&wins!==null&&wins>=0&&wins<=n?(wins/n*100).toFixed(1)+'%':n===0?'첫 청산 전':'—';
   const card=sleeve(v,'repeat_tp',s,ok,now,fresh);
+  const sig=s.surge_status||{},warm=num(sig.feed?.warmup_remaining);
+  const signal=(!fresh?'마지막 관측 · ':'')+(sig.reason==='WARMING_UP'&&warm!==null&&warm>0?'관측 준비 · 약 '+Math.ceil(warm/60)+'분 남음':why(sig.reason));
   return '<div class="s6"><section class="s6-hero">'+sectionHead('실전 · 7일 단독 운용','전략6 · 반복 익절',chip(ok?'계좌 확인':'계좌 확인 대기',ok?'on':'warn'))+weekBanner(s,now)+
     '<p class="s6-stamp">계좌 확인 <b>'+date(s.updated_at,true)+'</b> KST</p><dl class="s6-returns">'+metric('시험 시작 후 수익률',pct(good?w.return_pct:null),tone(good?w.return_pct:null))+metric('시험 총손익 · 평가 포함',krw(good?w.net_krw:null,true),tone(good?w.net_krw:null))+'</dl>'+
     '<dl class="s6-kpis">'+metric('시작 운용금',krw(w.initial_krw))+metric('현재 전략6 자산',krw(good?v.equity_krw:null))+metric('시험 실현손익',krw(w.realized_krw,true),tone(w.realized_krw))+metric('시험 청산 / 승률',count(w.closed)+' · '+win)+metric('공통 예비금 · 매매 제외',krw(s.reserve_krw))+'</dl></section>'+
+    pending('매수 신호: '+signal+' · 준비가 끝나도 조건을 충족해야 주문합니다.')+
     (!ok?pending('계좌 대사 또는 갱신 지연 · 현재 평가값은 표시하지 않습니다.'):'')+
     '<section>'+sectionHead('실거래 · 기존 누적과 시험 실적 구분','보유·주문 상세')+card+'</section><section>'+
     recent({...s,recent_closed:s.repeat_recent_closed})+'</section></div>';
