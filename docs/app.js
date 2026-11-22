@@ -1,4 +1,4 @@
-import {isSix,sixOverview,sixResearch} from './six-ui.js?v=six-detail-2';
+import {isSix,sixOverview,sixResearch,updateWeekClock} from './six-ui.js?v=s6-week-1';
 import {reviewNotice,runtimePanel,exitResearch} from './study-ui.js?v=20261030-1';
 import {twoTrackResearch} from './two-track-ui.js?v=20261109-2';
 import {splitOverview as globalSplitOverview,splitHistory as globalSplitHistory,morningResearch,surgeResearch} from './split-ui.js?v=six-1';
@@ -77,6 +77,6 @@ app.addEventListener('click',async event=>{const b=event.target.closest('button'
 dialogs.addEventListener('click',event=>{if(event.target.closest('[data-close]')||event.target.classList.contains('modal-backdrop'))dialogs.innerHTML='';});
 document.addEventListener('keydown',event=>{if(!dialogs.firstChild)return;if(event.key==='Escape')dialogs.innerHTML='';if(event.key==='Tab'){const buttons=[...dialogs.querySelectorAll('button')];if(buttons.length===1){event.preventDefault();buttons[0].focus();}}});
 document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(document.hidden)controller?.abort();else poll();});
-setInterval(()=>{const clock=document.querySelector('#live-clock');if(clock)clock.textContent=stamp(new Date().toISOString(),true);},1000);
+setInterval(()=>{if(document.hidden)return;const now=Date.now(),clock=document.querySelector('#live-clock');if(clock)clock.textContent=stamp(new Date(now).toISOString(),true);updateWeekClock(app,state.data?.split_portfolio,now);},1000);
 if(demo){const {fixture,splitFixture,twoTrackFixture,fourFixture,soloFixture}=await import('./demo.js?v=20261118-solo-1');state.data=new URLSearchParams(location.search).has('solo')?soloFixture():new URLSearchParams(location.search).has('legacy')?fixture():new URLSearchParams(location.search).has('four')?fourFixture():splitFixture();if(new URLSearchParams(location.search).has('twoTrack'))state.data.morning_two_track=twoTrackFixture();}
 render();poll();

@@ -52,6 +52,10 @@
 .s6 .s6-recentmini li {display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:.15rem .65rem; border-top:1px solid var(--s6-line); padding:.4rem 0; font-size:.9rem; overflow-wrap:anywhere}
 .s6 .s6-recentmini li > :last-child {font-variant-numeric:tabular-nums}
 .s6 .s6-recentmini small {color:var(--s6-muted); font-size:.835rem}
+.s6 .s6-week {display:grid;gap:.2rem;margin:.7rem 0 .9rem;padding:.7rem .85rem;background:#edf6f4;color:#143e38;border-inline-start:4px solid #268675;border-radius:.4rem;overflow-wrap:anywhere}
+.s6 .s6-week span {font-size:.82rem;font-weight:650}
+.s6 .s6-week strong {font-size:clamp(1.35rem,6vw,1.85rem);line-height:1.25;font-variant-numeric:tabular-nums;letter-spacing:0}
+.s6 .s6-week small {font-size:.79rem;line-height:1.45;color:#315650}
 @media(max-width:350px) {
   .s6 .s6-returns {padding:.6rem; gap:.3rem .55rem}
   .s6 .s6-detail-body dl {gap:.5rem .55rem}

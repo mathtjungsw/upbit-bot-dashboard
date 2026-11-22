@@ -29,6 +29,33 @@ Object.assign(reasonMap,{NET_TARGET:'순익 지정가 익절',FIXED_STOP_2:'−2
 const why=v=>typeof v==='string'&&v.length?(Object.hasOwn(reasonMap,v)?reasonMap[v]:v):'—';
 export const isSix=d=>d?.split_portfolio?.version==='split-six-v3'&&d.split_portfolio.live===true;
 function freshness(v,now,limit){const age=now-ms(v);return Number.isFinite(age)&&age>=-5000&&age<limit;}
+const weekMode='repeat_tp_only_week_v1', weekMs=7*86400000;
+export function weekClock(s,now){
+ const t=s.repeat_trial,normal=s.operation_mode==='six_equal_v1';
+ if(normal&&t?.phase==='restored')return {label:'시험 종료',note:'서버 원장에 6전략 복귀가 기록됐습니다.'};
+ if(normal&&(!t||t.phase==='pending'))return {label:'전환 대기',note:'전략6에 운용금이 모인 시각부터 7일을 셉니다.'};
+ if(s.operation_mode===weekMode&&t?.phase==='drain'&&t.history_epoch===s.research_epoch&&s.research_epoch)
+   return {label:'전환 중',note:'기존 보유·주문 정리 중입니다. 아직 7일을 세지 않습니다.'};
+ const start=t?.started_at,end=t?.expires_at;
+ if(s.operation_mode!==weekMode||t?.phase!=='running'||typeof s.research_epoch!=='string'||!s.research_epoch||t.history_epoch!==s.research_epoch||
+    ![start,end].every(v=>typeof v==='number'&&Number.isFinite(v)&&v>0)||Math.abs((end-start)*1000-weekMs)>.01||
+    !(ms(s.updated_at)>=start*1000-1)||!(now>=start*1000)||!Number.isFinite(now)||end*1000>8.64e15)
+   return {label:'시각 확인 중',note:'서버가 확인한 시작·마감 시각이 있어야 남은 시간을 표시합니다.'};
+ const sec=Math.max(0,Math.ceil((end*1000-now)/1000)),days=Math.floor(sec/86400),two=v=>String(v).padStart(2,'0');
+ return {label:sec?days+'일 '+two(Math.floor(sec/3600)%24)+':'+two(Math.floor(sec/60)%60)+':'+two(sec%60):'결정 대기',
+   note:'시작 '+date(start)+' → 마감 '+date(end)+' KST',timed:true};
+}
+export function updateWeekClock(root,s,now=Date.now()){
+ const el=root.querySelector('[data-week-clock]');if(!el||!s)return;
+ const clock=weekClock(s,now),out=el.querySelector('strong'),foot=el.querySelector('small');
+ const note=clock.note+(!freshness(s.updated_at,now,180000)?' · 서버 갱신 지연 (마지막 기록 기준)':'');
+ if(out.textContent!==clock.label)out.textContent=clock.label;
+ if(foot.textContent!==note)foot.textContent=note;
+}
+function weekBanner(s,now){
+ const c=weekClock(s,now);
+ return '<div class="s6-week" data-week-clock><span>전략6 단독 시험 · 7일까지</span><strong role="timer" aria-live="off">'+esc(c.label)+'</strong><small>'+esc(c.note)+(!freshness(s.updated_at,now,180000)?' · 서버 갱신 지연 (마지막 기록 기준)':'')+'</small></div>';
+}
 function orderView(o,now,fresh) {
  if(!o)return {label:'주문 확인 자료 없음',detail:'지정가 미제출·미확인 구분 필요',confirmed:false};
  if(o.state==='cancel_pending')return {label:'취소 확인 중',detail:'거래소의 최종 취소·체결 결과 대기',confirmed:false};
@@ -122,14 +149,14 @@ export function sixOverview(d,now=Date.now()) {
  const valued=ok&&!missingPrices.length&&owners.every(id=>indexed[id]&&('position' in indexed[id]));
  const total=valued&&eq!==null&&principal!==null?eq-principal:null,rate=total!==null&&principal>0?100*total/principal:null;
  const alloc=arr(s.recent_allocations).at(-1);
- return '<div class="s6"><section class="s6-hero">'+sectionHead('실전 계좌 · 원화','여섯 전략 운용',chip(ok?'대사 완료':fresh?'대사 확인 중':'갱신 지연',ok?'on':'warn'))+
+ return '<div class="s6"><section class="s6-hero">'+sectionHead('실전 계좌 · 원화',s.operation_mode===weekMode?'전략6 단독 시험':'여섯 전략 운용',chip(ok?'대사 완료':fresh?'대사 확인 중':'갱신 지연',ok?'on':'warn'))+weekBanner(s,now)+
  '<p class="s6-stamp">마지막 갱신 <b>'+date(s.updated_at,true)+'</b> KST</p><div class="s6-balance"><small>전체 운용자산</small><strong>'+krw(valued?eq:null)+'</strong></div>'+
  '<dl class="s6-kpis">'+metric('순투입 원금',krw(principal))+metric('누적 순손익',krw(total,true),tone(total))+metric('원금 대비 누적',pct(rate),tone(rate))+metric('6전략 전환 후',pct(valued?a.since_transition_pct:null))+
  metric('오늘 00시부터',pct(valued?a.today_pct:null))+metric('최근 14일 TWR',pct(valued?a.return_14d_pct:null))+'</dl></section>'+
  (faults.length?'<div role="alert" class="s6-alert"><b>보호 주문 점검 필요</b><p>'+esc(faults.map(ttl).join(' · '))+' — 전략 카드에서 실패 사유를 확인하세요.</p></div>':'')+
  (!ok?pending(!fresh?'계좌 스냅샷 갱신 지연 · 현재 자산과 수익률을 보류합니다.':'계좌 대사 미확인 · 현재 자산과 수익률을 보류합니다.'):'')+
  (fresh&&missingPrices.length?pending('보유 평가 호가 미확인: '+missingPrices.map(ttl).join(' · ')+' · 이 전략의 평가 수익률을 보류합니다.'):'')+
- '<section>'+sectionHead('운용 원화','배분 현황')+'<dl class="s6-kpis">'+metric('코인 보유',count(holdings,'개 전략'))+metric('재배분 가능',count(ok?s.rebalance_eligible_count:null,'개 전략'))+metric('공통 예비금',krw(s.reserve_krw))+metric('최근 재배분 KST',date(alloc?.at))+'</dl><p class="s6-note">미보유 전략이 4개 이상일 때 해당 전략의 가용 원화만 균등 배분합니다.</p></section>'+
+ '<section>'+sectionHead('운용 원화','배분 현황')+'<dl class="s6-kpis">'+metric('코인 보유',count(holdings,'개 전략'))+metric('재배분 가능',s.operation_mode===weekMode?'균등 배분 중지':count(ok?s.rebalance_eligible_count:null,'개 전략'))+metric('공통 예비금',krw(s.reserve_krw))+metric('최근 재배분 KST',date(alloc?.at))+'</dl><p class="s6-note">'+(s.operation_mode===weekMode?'단독 시험 중에는 6분할로 자동 복귀하지 않습니다.':'미보유 전략이 4개 이상일 때 해당 전략의 가용 원화만 균등 배분합니다.')+'</p></section>'+
  '<section>'+sectionHead('실제 매수·매도','전략별 계좌')+'<div class="s6-grid">'+owners.map(id=>sleeve(indexed[id],id,s,ok,now,fresh)).join('')+'</div></section>'+
  '<section>'+recent(s)+'</section></div>';
 }
