@@ -149,6 +149,17 @@ export function sixOverview(d,now=Date.now()) {
  const valued=ok&&!missingPrices.length&&owners.every(id=>indexed[id]&&('position' in indexed[id]));
  const total=valued&&eq!==null&&principal!==null?eq-principal:null,rate=total!==null&&principal>0?100*total/principal:null;
  const alloc=arr(s.recent_allocations).at(-1);
+ if(s.operation_mode===weekMode){
+  const v=indexed.repeat_tp,w=s.week_performance||{},good=ok&&!!v&&quoteKnown(v,'repeat_tp',now);
+  const n=num(w.closed),wins=num(w.wins),win=n>0&&wins!==null&&wins>=0&&wins<=n?(wins/n*100).toFixed(1)+'%':n===0?'첫 청산 전':'—';
+  const card=sleeve(v,'repeat_tp',s,ok,now,fresh);
+  return '<div class="s6"><section class="s6-hero">'+sectionHead('실전 · 7일 단독 운용','전략6 · 반복 익절',chip(ok?'계좌 확인':'계좌 확인 대기',ok?'on':'warn'))+weekBanner(s,now)+
+    '<p class="s6-stamp">계좌 확인 <b>'+date(s.updated_at,true)+'</b> KST</p><dl class="s6-returns">'+metric('시험 시작 후 수익률',pct(good?w.return_pct:null),tone(good?w.return_pct:null))+metric('시험 총손익 · 평가 포함',krw(good?w.net_krw:null,true),tone(good?w.net_krw:null))+'</dl>'+
+    '<dl class="s6-kpis">'+metric('시작 운용금',krw(w.initial_krw))+metric('현재 전략6 자산',krw(good?v.equity_krw:null))+metric('시험 실현손익',krw(w.realized_krw,true),tone(w.realized_krw))+metric('시험 청산 / 승률',count(w.closed)+' · '+win)+metric('공통 예비금 · 매매 제외',krw(s.reserve_krw))+'</dl></section>'+
+    (!ok?pending('계좌 대사 또는 갱신 지연 · 현재 평가값은 표시하지 않습니다.'):'')+
+    '<section>'+sectionHead('실거래 · 기존 누적과 시험 실적 구분','보유·주문 상세')+card+'</section><section>'+
+    recent({...s,recent_closed:s.repeat_recent_closed})+'</section></div>';
+ }
  return '<div class="s6"><section class="s6-hero">'+sectionHead('실전 계좌 · 원화',s.operation_mode===weekMode?'전략6 단독 시험':'여섯 전략 운용',chip(ok?'대사 완료':fresh?'대사 확인 중':'갱신 지연',ok?'on':'warn'))+weekBanner(s,now)+
  '<p class="s6-stamp">마지막 갱신 <b>'+date(s.updated_at,true)+'</b> KST</p><div class="s6-balance"><small>전체 운용자산</small><strong>'+krw(valued?eq:null)+'</strong></div>'+
  '<dl class="s6-kpis">'+metric('순투입 원금',krw(principal))+metric('누적 순손익',krw(total,true),tone(total))+metric('원금 대비 누적',pct(rate),tone(rate))+metric('6전략 전환 후',pct(valued?a.since_transition_pct:null))+
@@ -163,6 +174,18 @@ export function sixOverview(d,now=Date.now()) {
 export function sixResearch(d,now=Date.now()){
  if(!isSix(d))return '';
  const s=d.split_portfolio,r=d.six_research??s.six_research;
+ if(s.operation_mode===weekMode){
+  const head=sectionHead('실계좌와 별도 집계','전략6 가상 비교',chip('연구 전용'));
+  function block(x,stress){
+   if(!x||x.scope!=='s6_only'||x.epoch!=='s6-week-'+s.research_epoch||x.paper_only!==true||x.live_orders_enabled!==false||
+      x.diagnostics?.stress!==stress)return pending('전략6 전용 자료 대기');
+   return '<p class="s6-note">'+(stress?'체결 지연·비용을 높인 모의 체결':'기본 비용·호가와 공개 체결 기반 추정')+' · '+date(x.updated_at,true)+' KST'+(!freshness(x.updated_at,now,120000)?' · 갱신 지연':'')+'</p><ul class="s6-list">'+roles.map(role=>{
+    const matches=arr(x.models).filter(m=>m.strategy===6&&m.role===role);const m=matches.length===1?matches[0]:{};
+    return '<li><div><b>'+esc(m.label||roleName[role])+'</b><small>청산 '+count(m.trades)+' · 보유 '+count(m.open_positions)+'</small></div><div><b>'+pct(m.return_pct)+'</b><small>실현 '+krw(m.realized_krw,true)+'</small></div></li>';
+   }).join('')+'</ul>';
+  }
+  return '<div class="s6"><section>'+head+block(r,false)+'</section><section>'+sectionHead('같은 세 조건','비용 스트레스')+block(d.s6_week_stress,true)+'</section></div>';
+ }
  const ok=r?.version==='six-forward-v1'&&typeof s.research_epoch==='string'&&s.research_epoch.length>0&&r.epoch===s.research_epoch&&r.paper_only===true&&r.live_orders_enabled===false;
  const head=sectionHead('실전과 별도로 집계','가상 연구 · 14일 리뷰',chip('가상 전용'));
  if(!ok)return '<div class="s6"><section>'+head+pending('새 연구 세대의 입력 대기 · 이전 가상 성과를 대신 표시하지 않습니다.')+'</section></div>';

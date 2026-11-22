@@ -179,13 +179,14 @@ function orderRow(o){
 }
 
 export function splitHistory(d,{owner='ALL',side='ALL',page=0}={}){
+ const only=d.split_portfolio?.operation_mode==='repeat_tp_only_week_v1';if(only)owner='repeat_tp';
  const found=filledOrders(d.split_portfolio).filter(o=>(owner==='ALL'||o.owner===owner)&&(side==='ALL'||o.side===side));
  const pages=Math.ceil(found.length/10);
  const current=Math.max(0,Math.min(Math.max(0,pages-1),Number.isFinite(page)?Math.floor(page):0));
  const filter=(values,selected,attr,title)=>'<div class="sd-filters" role="group" aria-label="'+title+'">'+values.map(([key,text])=>
   '<button data-'+attr+'="'+key+'" data-focus-id="'+attr+'-'+key+'" aria-pressed="'+(selected===key)+'">'+text+'</button>').join('')+'</div>';
  return '<div class="sd"><section class="sd-section">'+heading('실전 거래내역','<span>조회 결과 '+found.length+'건</span>')+
-  filter([['ALL','전체 전략'],...[...Object.keys(names),...(d.split_portfolio?.version==='split-six-v3'?Object.keys(more):[])].map(k=>[k,label(k)])],owner,'split-owner','전략 선택')+
+  (only?'<p class="sd-note">전략6 · 반복 익절 체결 내역 (시험 전 기록 포함)</p>':filter([['ALL','전체 전략'],...[...Object.keys(names),...(d.split_portfolio?.version==='split-six-v3'?Object.keys(more):[])].map(k=>[k,label(k)])],owner,'split-owner','전략 선택'))+
   filter([['ALL','전체 체결'],['BUY','매수'],['SELL','매도']],side,'split-side','매수·매도 선택')+
   '<div class="sd-list">'+(found.length?found.slice(current*10,current*10+10).map(orderRow).join(''):empty('선택한 조건에 해당하는 체결이 없습니다.'))+'</div>'+
   (pages>1?'<div class="sd-pages"><button data-split-page="'+(current-1)+'" data-focus-id="split-prev" '+(!current?'disabled':'')+'>이전</button><span>'+(current+1)+' / '+pages+'</span><button data-split-page="'+(current+1)+'" data-focus-id="split-next" '+(current+1>=pages?'disabled':'')+'>다음</button></div>':'')+
