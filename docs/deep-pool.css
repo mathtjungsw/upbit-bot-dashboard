@@ -52,6 +52,9 @@
 .dp-slot-main span{display:block;font-size:.8125rem;color:var(--dp-muted)}
 .dp-slot-main strong{min-width:max-content;font-size:1rem}
 .dp-slot-cash dd,.dp-slot-stats dd,.dp-slot-trail dd,.dp-research dd{font-weight:740;font-size:1rem}
+.dp-slot-cash{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.dp-slot .dp-slot-meta{font-size:.8125rem;color:var(--dp-muted);margin-top:6px}
+.dp-slot .dp-slot-check{border-top:1px solid var(--dp-edge);padding-top:8px;margin-top:9px}
 .dp-slot-stats,.dp-slot-trail{border-top:1px solid var(--dp-edge);padding-top:9px;margin-top:9px!important}
 .dp-rule dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px}
 .dp-rule dd{font-weight:700}

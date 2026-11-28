@@ -1,5 +1,5 @@
 import {isSix,sixOverview,sixResearch,updateWeekClock} from './six-ui.js?v=s6-only-3';
-import {deepOverview,deepHistory,deepResearch} from './deep-pool.mjs?v=design-1';
+import {deepOverview,deepHistory,deepResearch} from './deep-pool.mjs?v=observability-2';
 import {reviewNotice,runtimePanel,exitResearch} from './study-ui.js?v=20261030-1';
 import {twoTrackResearch} from './two-track-ui.js?v=20261109-2';
 import {splitOverview as globalSplitOverview,splitHistory as globalSplitHistory,morningResearch,surgeResearch} from './split-ui.js?v=s6-only-2';

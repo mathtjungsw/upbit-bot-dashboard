@@ -1,6 +1,18 @@
 // Display authenticated snapshots. This module does not fetch or send orders.
 const n = x => typeof x === 'number' && Number.isFinite(x);
 const labels = {held:'보유 중',flat:'현금 대기',cooling:'재진입 대기',pending:'주문 확인 중',blocked:'확인 필요'};
+const checks = {
+  OPEN_ORDER_RECONCILIATION:'미결 주문 확인 중', ACCOUNT_CHECK_FAILED:'계좌 대사 확인 필요',
+  SELL_FIRST:'매도 주문을 먼저 처리 중', ENTRY_PAUSED:'신규 매수 중지', COOLDOWN:'재진입 대기',
+  BAR_DEADLINE:'이번 5분봉 주문 시한 경과', NO_CANDIDATE:'낙폭 조건을 충족한 후보 없음',
+  POOL_EXHAUSTED:'중복 없이 선택할 후보 소진', LOW_TURNOVER:'선택 후보의 거래대금 부족',
+  WARNING_OR_UNKNOWN:'유의 종목 또는 유의 여부 미확인', STALE_QUOTE:'호가가 오래됨',
+  ASK_ABOVE_CHASE_LIMIT:'매도 호가가 추격 매수 제한 초과', ASK_ABOVE_DRAWDOWN_LIMIT:'매도 호가가 낙폭 기준을 벗어남',
+  BELOW_MIN_ORDER:'최소 주문금액 미달', ORDER_PENDING:'매수 주문 체결 확인 중',
+  PREVIOUS_ORDER_PENDING:'앞선 분할 주문 확인 대기', NO_FILL:'종료된 주문의 체결 수량 없음',
+  SCAN_ERROR:'시세 스캔 중 오류', CHECK_ERROR:'후보 또는 주문 확인 중 오류',
+  PREVIOUS_CHECK_ERROR:'앞선 분할 처리 중 오류',
+};
 const f = (x, digits=0) => x.toLocaleString('ko-KR',{maximumFractionDigits:digits});
 const unit = (x, suffix, digits=0) => n(x) ? f(x,digits)+suffix : '—';
 const signed = (x, suffix) => !n(x) ? '—' : (x>0?'+':x<0?'−':'')+(suffix==='%'?Math.abs(x).toFixed(2):f(Math.abs(x)))+suffix;
@@ -21,12 +33,17 @@ function card(x, paused) {
   const label=paused&&key==='flat'?'신규 매수 중지':labels[key]??'상태 미확인';
   const title=m?m.slice(4):key==='pending'?'주문 확인 중':key==='unknown'||key==='held'?'종목 확인 중':'미보유';
   const supporting=m?'KRW 마켓':key==='cooling'?(n(x.cooldown_minutes)?`재진입까지 ${f(x.cooldown_minutes)}분`:'대기 시간 미확인'):key==='blocked'?'계좌 또는 주문 상태 확인 필요':key==='flat'?(paused?'가용 현금 유지':'조건 충족 시 매수'):'';
+  const last=x.entry_check, check=last&&Object.hasOwn(checks,last.reason)?checks[last.reason]:null;
+  const at=last&&n(last.at)&&Math.abs(last.at)<8640000000000?date(new Date(last.at*1000).toISOString()):null;
+  const markAt=n(x.holdings_marked_at)&&Math.abs(x.holdings_marked_at)<8640000000000?date(new Date(x.holdings_marked_at*1000).toISOString()):null;
   return `<article class="dp-slot dp-state-${key}">
     <header class="dp-slot-head"><span class="dp-slot-id">분할 ${String(x.slot).padStart(2,'0')}</span><span class="dp-chip">${label}</span></header>
     <div class="dp-slot-main"><div><h3>${title}</h3><span>${supporting}</span></div>${m?`<strong class="dp-${tone(x.position_pct)}">${signed(x.position_pct,'%')}</strong>`:''}</div>
-    <dl class="dp-slot-cash">${metric('원화 잔액',unit(x.cash_krw,'원'))}</dl>
+    <dl class="dp-slot-cash">${metric('원화 잔액',unit(x.cash_krw,'원'))}${m||key==='pending'?metric('보유 코인 평가액',unit(x.holdings_value_krw,'원')):''}</dl>
+    ${m&&markAt?`<p class="dp-slot-meta">가격 기준 ${markAt} KST</p>`:''}
     <dl class="dp-slot-stats">${metric('실현손익',signed(x.realized_krw,'원'),tone(x.realized_krw))}${metric('평가손익',signed(x.unrealized_krw,'원'),tone(x.unrealized_krw))}</dl>
     ${m?`<dl class="dp-slot-trail">${metric('트레일 청산선',unit(x.trail_floor,'원',8))}</dl>`:''}
+    ${!m&&check?`<p class="dp-slot-meta dp-slot-check">최근 매수 검사 · ${check}${market(last.market)?` (${market(last.market)})`:''}${at?` · ${at} KST`:''}</p>`:''}
   </article>`;
 }
 export function deepOverview(d) {
@@ -41,8 +58,8 @@ export function deepOverview(d) {
     <section class="dp-hero" aria-labelledby="dp-title">
       <header class="dp-hero-head"><div><p class="dp-kicker">업비트 · ${s.mode==='live'?'실계좌':'가상 연구'}</p><h2 id="dp-title">고점 낙폭 5분할</h2></div><span class="dp-hero-tag">KRW 현물</span></header>
       <dl class="dp-hero-result">${metric('누적 수익률',signed(ret,'%'),tone(ret))}${metric('누적 손익',signed(pnl,'원'),tone(pnl))}</dl>
-      <dl class="dp-hero-basis">${metric('시작 원금',unit(s.initial,'원'))}${metric('합계 원화 잔액',unit(sum(rows,'cash_krw'),'원'))}</dl>
-      <p class="dp-hero-note">분할 운용 원금 기준 · 공통 예비금 제외</p>
+      <dl class="dp-hero-basis">${metric('시작 원금',unit(s.initial,'원'))}${metric('합계 원화 잔액',unit(sum(rows,'cash_krw'),'원'))}${rows?.some(x=>Object.hasOwn(x,'holdings_value_krw'))?metric('합계 보유 코인 평가액',unit(sum(rows,'holdings_value_krw'),'원')):''}</dl>
+      <p class="dp-hero-note">공통 예비금 제외 · 코인 평가액은 매도 수수료 차감 전</p>
     </section>
     <section aria-labelledby="dp-positions"><div class="dp-section-head"><div><p class="dp-eyebrow">운용 현황</p><h2 id="dp-positions">분할별 계좌</h2></div>${rows?`<span class="dp-counter">보유 ${held} / 5</span>`:''}</div>
       ${rows?`<div class="dp-slot-grid">${rows.map(x=>card(x,s.paused===true)).join('')}</div>`:'<p class="dp-empty">5개 분할의 원장 자료를 확인할 수 없습니다.</p>'}

@@ -40,3 +40,16 @@ test('history is KST and distinguishes no fills from amounts',()=>{
  assert.doesNotMatch(r,/<script>/);
  assert.match(deepResearch(),/실전과 별도/);
 });
+test('coin valuation is distinct from cash and no unknown mark is counted as zero',()=>{
+ const s=slots();
+ s.forEach(x=>x.holdings_value_krw=0);
+ Object.assign(s[0],{status:'held',market:'KRW-T',holdings_value_krw:12345,holdings_marked_at:Date.parse('2026-11-28T11:10:00Z')/1000});
+ s[3].entry_check={at:Date.parse('2026-11-28T11:10:00Z')/1000,reason:'LOW_TURNOVER',market:'KRW-A'};
+ let r=deepOverview(state(s));
+ assert.match(r,/합계 보유 코인 평가액<\/dt><dd class="dp-neutral">12,345원/);
+ assert.match(r,/가격 기준 11\.28 20:10 KST/);
+ assert.match(r,/선택 후보의 거래대금 부족 \(KRW-A\)/);
+ s[0].holdings_value_krw=null;
+ r=deepOverview(state(s));
+ assert.match(r,/합계 보유 코인 평가액<\/dt><dd class="dp-neutral">—/);
+});
