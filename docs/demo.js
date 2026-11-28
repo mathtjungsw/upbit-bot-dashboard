@@ -1,4 +1,17 @@
 // Synthetic data only. Loaded solely on a localhost ?demo preview.
+export function deepFixture(){
+ const d=fixture(), now=Date.now();
+ d.deep_pool={version:'deep-pool-v1',mode:'live',initial:1500000,paused:false,
+   slots:[
+     {slot:1,status:'held',market:'KRW-DEMOA',cash_krw:4000,realized_krw:0,unrealized_krw:38920,position_pct:13.15,trail_floor:1020,cooldown_minutes:0},
+     {slot:2,status:'held',market:'KRW-DEMOB',cash_krw:0,realized_krw:0,unrealized_krw:-12450,position_pct:-4.15,trail_floor:null,cooldown_minutes:0},
+     {slot:3,status:'cooling',cash_krw:312450,realized_krw:12450,unrealized_krw:0,cooldown_minutes:47},
+     {slot:4,status:'flat',cash_krw:300000,realized_krw:0,unrealized_krw:0,cooldown_minutes:0},
+     {slot:5,status:'pending',cash_krw:300000,realized_krw:0,unrealized_krw:0,cooldown_minutes:0}],
+   recent:[{slot:3,market:'KRW-DEMOC',side:'SELL',qty:'312.452',fee:'145.217',at:new Date(now-780000).toISOString()},
+     {slot:2,market:'KRW-DEMOB',side:'BUY',qty:'1000',fee:'149.92',at:new Date(now-15000000).toISOString()}]};
+ return {...d,positions:[],trades:[],policy:{buy_paused:false}};
+}
 export function fixture(){
  const now=new Date().toISOString();
  const research={available:true,frozen:false,started_at:new Date(Date.now()-86400000).toISOString(),updated_at:now,rows:[['실전조건 · 이격 20% 이하',2.68,-1.21,null,true],['비교1 · 이격 상한 없음',1.14,-3.52,'KRW-DEMO',false],['비교2 · 이격 15% 이하',1.85,-.83,null,false]].map(([name,rate,mdd,ticker,base],i)=>({id:String(i),name,marked_return_pct:rate,stress_return_pct:rate-.21,max_drawdown_pct:mdd,trades:3-i,is_baseline:base,open_ticker:ticker}))};
